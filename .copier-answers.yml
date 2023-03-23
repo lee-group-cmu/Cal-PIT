@@ -1,0 +1,15 @@
+# Changes here will be overwritten by Copier
+_commit: v1.3.0
+_src_path: gh:lincc-frameworks/python-project-template
+author_email: biprateep@pitt.edu
+author_name: Biprateep Dey
+create_example_module: true
+custom_install: true
+include_notebooks: true
+module_name: calpit
+mypy_type_checking: basic
+preferred_linter: black
+project_license: MIT
+project_name: Cal-PIT
+use_gitlfs: none
+use_isort: true
