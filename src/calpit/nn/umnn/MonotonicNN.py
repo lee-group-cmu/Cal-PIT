@@ -9,8 +9,8 @@ def _flatten(sequence):
     return torch.cat(flat) if len(flat) > 0 else torch.tensor([])
 
 
-def clipped_relu(x, device):
-    return torch.minimum(torch.maximum(torch.Tensor([0]).to(device), x), torch.Tensor([1]).to(device))
+def clipped_relu(x):
+    return torch.minimum(torch.maximum(torch.Tensor([0]), x), torch.Tensor([1]))
 
 
 class IntegrandNN(nn.Module):
@@ -34,7 +34,7 @@ class IntegrandNN(nn.Module):
 
 
 class MonotonicNN(nn.Module):
-    def __init__(self, in_d, hidden_layers, nb_steps=50, sigmoid=False, dev="cpu"):
+    def __init__(self, in_d, hidden_layers, nb_steps=50, sigmoid=False):
         super(MonotonicNN, self).__init__()
         self.integrand = IntegrandNN(in_d, hidden_layers)
         self.net = []
@@ -49,7 +49,6 @@ class MonotonicNN(nn.Module):
         self.net.pop()  # pop the last ReLU for the output layer
         # It will output the scaling and offset factors.
         self.net = nn.Sequential(*self.net)
-        self.device = dev
         self.nb_steps = nb_steps
         self.sigmoid = sigmoid
 
@@ -61,7 +60,7 @@ class MonotonicNN(nn.Module):
     def forward(self, x_input):
         x = x_input[:, 0][:, None]
         h = x_input[:, 1:]
-        x0 = torch.zeros(x.shape).to(self.device)
+        x0 = torch.zeros(x.shape).to(x_input)
         out = self.net(h)
         offset = out[:, [0]]
         scaling = torch.exp(out[:, [1]])
@@ -74,7 +73,7 @@ class MonotonicNN(nn.Module):
                 + offset
             )
         else:
-            return (
+            return torch.squeeze(
                 scaling
                 * ParallelNeuralIntegral.apply(
                     x0, x, self.integrand, _flatten(self.integrand.parameters()), h, self.nb_steps
