@@ -2,6 +2,57 @@ from scipy.stats import binom
 from matplotlib import pyplot as plt
 import numpy as np
 
+
+def cde_loss(cde_estimates, z_grid, z_test):
+    """
+    Calculates conditional density estimation loss on holdout data
+
+    @param cde_estimates: a numpy array where each row is a density
+    estimate on z_grid
+    @param z_grid: a numpy array of the grid points at which cde_estimates is evaluated
+    @param z_test: a numpy array of the true z values corresponding to the rows of cde_estimates
+
+    @returns The CDE loss (up to a constant) for the CDE estimator on
+    the holdout data and the SE error
+    """
+    
+    if len(z_test.shape) == 1:
+        z_test = z_test.reshape(-1, 1)
+    if len(z_grid.shape) == 1:
+        z_grid = z_grid.reshape(-1, 1)
+
+    n_obs, n_grid = cde_estimates.shape
+    n_samples, feats_samples = z_test.shape
+    n_grid_points, feats_grid = z_grid.shape
+
+    if n_obs != n_samples:
+        raise ValueError("Number of samples in CDEs should be the same as in z_test."
+                         "Currently %s and %s." % (n_obs, n_samples))
+    if n_grid != n_grid_points:
+        raise ValueError("Number of grid points in CDEs should be the same as in z_grid."
+                         "Currently %s and %s." % (n_grid, n_grid_points))
+
+    if feats_samples != feats_grid:
+        raise ValueError("Dimensionality of test points and grid points need to coincise."
+                         "Currently %s and %s." % (feats_samples, feats_grid))
+
+ 
+
+
+    integrals = np.trapz(cde_estimates**2, np.squeeze(z_grid),axis=1)
+    
+
+    nn_ids = np.argmin(np.abs(z_grid - z_test.T), axis=0)
+    likeli = cde_estimates[(tuple(np.arange(n_samples)), tuple(nn_ids))]
+
+    losses = integrals - 2 * likeli
+    loss = np.mean(losses)
+    se_error = np.std(losses, axis=0) / (n_obs ** 0.5)
+
+    return loss, se_error
+
+
+
 def normalize(cde_estimates, x_grid, tol=1e-6, max_iter=200):
     """Normalizes conditional density estimates to be non-negative and
     integrate to one.
@@ -18,6 +69,7 @@ def normalize(cde_estimates, x_grid, tol=1e-6, max_iter=200):
     else:
         normalized_cde = np.apply_along_axis(_normalize, 1, cde_estimates, x_grid, tol=tol, max_iter=max_iter)
     return normalized_cde
+
 
 def _normalize(density, x_grid, tol=1e-6, max_iter=500):
     """Normalizes a density estimate to be non-negative and integrate to
@@ -37,7 +89,7 @@ def _normalize(density, x_grid, tol=1e-6, max_iter=500):
     area = np.trapz(np.maximum(density, 0.0), x_grid)
     if area == 0.0:
         # replace with uniform if all negative density
-        density[:] = 1/(x_grid.max() - x_grid.min())
+        density[:] = 1 / (x_grid.max() - x_grid.min())
     elif area < 1:
         density /= area
         density[density < 0.0] = 0.0
@@ -56,8 +108,9 @@ def _normalize(density, x_grid, tol=1e-6, max_iter=500):
     # update in place
     density -= mid
     density[density < 0.0] = 0.0
-    
+
     return density
+
 
 def kolmogorov_smirnov_statistic(cdf_test, cdf_ref):
     """
@@ -65,8 +118,9 @@ def kolmogorov_smirnov_statistic(cdf_test, cdf_ref):
     cdf_ref: CDF of the reference distribution on the same grid (array)
     """
     ks = np.max(np.abs(cdf_test - cdf_ref), axis=-1)
-    
+
     return ks
+
 
 def cramer_von_mises(cdf_test, cdf_ref):
     """
@@ -77,6 +131,7 @@ def cramer_von_mises(cdf_test, cdf_ref):
 
     cvm2 = np.trapz(diff, cdf_ref, axis=-1)
     return np.sqrt(cvm2)
+
 
 def anderson_darling_statistic(cdf_test, cdf_ref, n_tot=1):
     """
@@ -89,7 +144,6 @@ def anderson_darling_statistic(cdf_test, cdf_ref, n_tot=1):
 
     ad2 = n_tot * np.trapz((num / den), cdf_ref, axis=-1)
     return np.sqrt(ad2)
-
 
 
 def get_pit(cdes: np.ndarray, z_grid: np.ndarray, z_test: np.ndarray) -> np.ndarray:
@@ -125,10 +179,6 @@ def get_pit(cdes: np.ndarray, z_grid: np.ndarray, z_test: np.ndarray) -> np.ndar
             "Currently %s and %s." % (nrow_cde, n_grid_points)
         )
 
-    z_min = np.min(z_grid)
-    z_max = np.max(z_grid)
-    z_delta = (z_max - z_min) / (n_grid_points - 1)
-
     # Vectorized implementation using masked arrays
     pit = np.ma.masked_array(cdes, (z_grid > z_test[:, np.newaxis]))
     pit = np.trapz(pit, z_grid)
@@ -138,7 +188,8 @@ def get_pit(cdes: np.ndarray, z_grid: np.ndarray, z_test: np.ndarray) -> np.ndar
 
 def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
     """
-    Plots the PIT/HPD histogram and calculates the confidence interval for the bin values, were the PIT/HPD values follow an uniform distribution
+    Plots the PIT/HPD histogram and calculates the confidence interval for the bin values,
+    were the PIT/HPD values follow an uniform distribution
 
     @param values: a numpy array with PIT/HPD values
     @param ci_level: a float between 0 and 1 indicating the size of the confidence level
@@ -146,8 +197,8 @@ def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
     @param n_bins: an integer, the number of bins in the histogram
     @param figsize: a tuple, the plot size (width, height)
     @param ylim: a list of two elements, including the lower and upper limit for the y axis
-
-    @returns The matplotlib figure object with the histogram of the PIT/HPD values and the CI for the uniform distribution
+    @returns The matplotlib figure object with the histogram of the PIT/HPD values
+    and the CI for the uniform distribution
     """
 
     # Extract the number of CDEs
@@ -187,30 +238,30 @@ def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
     # quant_data = np.percentile(pit_values,quants)
 
     ax[1].scatter(prob_theory, prob_data, marker=".")
-    ax[1].plot(prob_theory,prob_theory, c="k", ls="--")
+    ax[1].plot(prob_theory, prob_theory, c="k", ls="--")
     ax[1].set_xlim(0, 1)
     ax[1].set_ylim(0, 1)
     ax[1].set_xlabel("Expected Cumulative Probability")
     ax[1].set_ylabel("Empirical Cumulative Probability")
-    xlabels = np.linspace(0,1,6)[1:]
+    xlabels = np.linspace(0, 1, 6)[1:]
     ax[1].set_xticks(xlabels)
     ax[1].set_aspect("equal")
     if y_true is not None:
-        ks = kolmogorov_smirnov_statistic(prob_data,prob_theory)
-        ad = anderson_darling_statistic(prob_data,prob_theory, len(y_true))
-        cvm = cramer_von_mises(prob_data,prob_theory)
-        ax[1].text(0.05,0.9,f"KS:  ${ks:.3f} $", fontsize=15)
-        ax[1].text(0.05,0.84,f"CvM:  ${cvm:.3f} $", fontsize=15)
-        ax[1].text(0.05,0.78,f"AD:  ${ad:.2f} $", fontsize=15)
-    
+        ks = kolmogorov_smirnov_statistic(prob_data, prob_theory)
+        ad = anderson_darling_statistic(prob_data, prob_theory, len(y_true))
+        cvm = cramer_von_mises(prob_data, prob_theory)
+        ax[1].text(0.05, 0.9, f"KS:  ${ks:.3f} $", fontsize=15)
+        ax[1].text(0.05, 0.84, f"CvM:  ${cvm:.3f} $", fontsize=15)
+        ax[1].text(0.05, 0.78, f"AD:  ${ad:.2f} $", fontsize=15)
 
     return fig, ax
+
 
 def trapz_grid(y, x):
     """
     Does trapezoid integration between the same limits as the grid.
     """
     dx = np.diff(x)
-    trapz_area = dx* (y[:, 1:]+y[:, :-1])/2
-    integral = np.cumsum(trapz_area, axis =-1)
-    return np.hstack((np.zeros(len(integral))[:,None], integral))
+    trapz_area = dx * (y[:, 1:] + y[:, :-1]) / 2
+    integral = np.cumsum(trapz_area, axis=-1)
+    return np.hstack((np.zeros(len(integral))[:, None], integral))
