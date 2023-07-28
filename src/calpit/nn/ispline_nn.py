@@ -4,23 +4,23 @@ from splinebasis import ISplineBasis
 
 
 class ISplineLayer(nn.Module):
-    def __init__(self, in_features, num_basis):
+    def __init__(self, in_features, num_basis,dropout_p=0):
         super().__init__()
         self.in_features = in_features
         self.num_basis = num_basis
-        self.coefs = nn.Sequential(nn.Linear(in_features, num_basis), nn.Softmax(dim=-1))
+        self.coefs = nn.Sequential(nn.Linear(in_features, num_basis), nn.Softmax(dim=-1),nn.Dropout(p=dropout_p))
         self.grid = torch.linspace(0, 1, 1000)
         self.basis_vectors = ISplineBasis(
             order=3, num_basis=num_basis, lower=0, upper=1, grid=self.grid
         ).basis_vectors
         self.basis_vectors = torch.from_numpy(self.basis_vectors)
 
-        def init_weights(m):
-            if isinstance(m, nn.Linear):
-                torch.nn.init.kaiming_normal_(m.weight)
-                m.bias.data.fill_(0.01)
+#         def init_weights(m):
+#             if isinstance(m, nn.Linear):
+#                 torch.nn.init.kaiming_normal_(m.weight)
+#                 m.bias.data.fill_(0.01)
 
-        self.coefs.apply(init_weights)
+#         self.coefs.apply(init_weights)
 
     def interp1d(self, x, y, x_new):
         # 2. Find where in the original data, the values to interpolate
@@ -61,26 +61,28 @@ class ISplineLayer(nn.Module):
 
         # print(basis.shape)
         # print(self.coefs(x).shape)
+        # print(self.coefs(x))
         weighted_basis = self.coefs(x) * basis
         # print(weighted_basis.shape)
         return weighted_basis.sum(axis=-1)
 
 
 class IsplineNN(nn.Module):
-    def __init__(self, input_dim, hidden_layers=[512, 512, 512], num_basis=10):
+    def __init__(self, input_dim, hidden_layers=[512, 512, 512],dropout_p=0.5, num_basis=10):
         super().__init__()
         self.all_layers = [input_dim + 1]
         self.hidden_layers = hidden_layers
         self.all_layers.extend(hidden_layers)
         self.num_basis = num_basis
-        self.spline_layer = ISplineLayer(in_features=self.hidden_layers[-1], num_basis=self.num_basis)
+        self.dropout_p = dropout_p
+        self.spline_layer = ISplineLayer(in_features=self.hidden_layers[-1], num_basis=self.num_basis,dropout_p=self.dropout_p)
 
         self.mlp_layer_list = []
         for i in range(len(self.all_layers) - 1):
             self.mlp_layer_list.append(nn.Linear(self.all_layers[i], self.all_layers[i + 1]))
             self.mlp_layer_list.append(nn.PReLU())
 
-        self.mlp_layer_list.append(nn.Dropout(p=0.3))
+        # self.mlp_layer_list.append(nn.Dropout(p=dropout_p))
         self.mlp_layers = nn.Sequential(*self.mlp_layer_list)
 
         def init_weights(m):
