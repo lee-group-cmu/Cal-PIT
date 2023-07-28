@@ -22,7 +22,7 @@ RUN HDF5_MPI=ON CC=mpicc HDF5_DIR=/opt/bin/hdf5 pip install --no-deps --no-binar
 RUN pip install --no-cache-dir \
     ruamel.yaml pyyaml cmake ipympl pillow wandb numpy torchsummary pandas \
     astropy matplotlib scipy arrow black cdetools flexcode pywavelets\
-    spline-basis  \
+    spline-basis  ipykernel\
     jupyter-server-proxy requests tabulate ray ray[tune] ray[rllib] h5py \
     opencv-python-headless scikit-image mpi4py deepspeed einops \
     pytorch-lightning ray_lightning \
