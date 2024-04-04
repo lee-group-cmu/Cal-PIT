@@ -1,5 +1,5 @@
 [project]
-name = "Cal-PIT"
+name = "calpit"
 license = {file = "LICENSE"}
 readme = "README.md"
 authors = [
@@ -14,32 +14,29 @@ classifiers = [
     "Programming Language :: Python",
 ]
 dynamic = ["version"]
+requires-python = ">=3.9"
 dependencies = [
-    "deprecated",
-    "ipykernel", # Support for Jupyter notebooks
 ]
+
+[project.urls]
+"Source Code" = "https://github.com/lee-group-cmu/calpit"
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
 dev = [
+    "asv==0.6.1", # Used to compute performance benchmarks
+    "black", # Used for static linting of files
+    "jupyter", # Clears output from Jupyter notebooks
+    "mypy", # Used for static type checking of files
+    "pre-commit", # Used to run checks before finalizing a git commit
+    "pylint", # Used for static linting of files
     "pytest",
     "pytest-cov", # Used to report total code coverage
-    "pre-commit", # Used to run checks before finalizing a git commit
-    "sphinx==6.1.3", # Used to automatically generate documentation
-    "sphinx_rtd_theme==1.2.0", # Used to render documentation
-    "sphinx-autoapi==2.0.1", # Used to automatically generate api documentation
-    "black", # Used for static linting of files
-    "mypy", # Used for static type checking of files
-    "nbconvert", # Needed for pre-commit check to clear output from Python notebooks
-    "nbsphinx", # Used to itegrate Python notebooks into Sphinx documentation
-    "ipython", # Also used in building notebooks into Sphinx
-    "matplotlib", # Used in sample notebook intro_notebook.ipynb
-    "numpy", # Used in sample notebook intro_notebook.ipynb
 ]
 
 [build-system]
 requires = [
-    "setuptools>=45", # Used to build and package the Python project
+    "setuptools>=62", # Used to build and package the Python project
     "setuptools_scm>=6.2", # Gets release version from git. Makes it available programmatically
 ]
 build-backend = "setuptools.build_meta"
@@ -47,7 +44,65 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 write_to = "src/calpit/_version.py"
 
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+
 [tool.black]
 line-length = 110
+target-version = ["py39"]
 
+[tool.isort]
+profile = "black"
+line_length = 110
 
+[tool.ruff]
+line-length = 110
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    "W",
+    # Pyflakes
+    "F",
+    # pep8-naming
+    "N",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # docstrings
+    "D101",
+    "D102",
+    "D103",
+    "D106",
+    "D206",
+    "D207",
+    "D208",
+    "D300",
+    "D417",
+    "D419",
+
+]
+
+ignore = [
+    "UP006", # Allow non standard library generics in type hints
+    "UP007", # Allow Union in type hints
+    "SIM114", # Allow if with same arms
+    "B028", # Allow default warning level
+    "SIM117", # Allow nested with
+    "UP015", # Allow redundant open parameters
+    "UP028", # Allow yield in for loop
+]
+[tool.setuptools.package-data]
+calpit = ["py.typed"]
+
+[tool.coverage.run]
+omit=["src/calpit/_version.py"]
