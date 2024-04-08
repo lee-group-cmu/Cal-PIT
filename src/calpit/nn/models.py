@@ -2,6 +2,20 @@ import torch.nn as nn
 
 
 class MLP(nn.Module):
+    """
+    Multi-Layer Perceptron (MLP) neural network model.
+
+    Args:
+        input_dim (int): The number of input features.
+        output_dim (int): The number of output units.
+        hidden_layers (list): A list of integers representing the number of units in each hidden layer.
+        sigmoid (bool): Whether to apply a sigmoid activation function to the output layer.
+
+    Methods:
+        forward(x): Performs a forward pass through the MLP.
+
+    """
+
     def __init__(self, input_dim=6, output_dim=1, hidden_layers=[512, 512, 512], sigmoid=False):
         super().__init__()
         self.all_layers = [input_dim]
@@ -25,4 +39,14 @@ class MLP(nn.Module):
         self.layers.apply(init_weights)
 
     def forward(self, x):
+        """
+        Performs a forward pass through the MLP.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor.
+
+        """
         return self.layers(x)
