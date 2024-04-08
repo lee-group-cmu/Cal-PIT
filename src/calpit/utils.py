@@ -15,7 +15,7 @@ def cde_loss(cde_estimates, z_grid, z_test):
     @returns The CDE loss (up to a constant) for the CDE estimator on
     the holdout data and the SE error
     """
-    
+
     if len(z_test.shape) == 1:
         z_test = z_test.reshape(-1, 1)
     if len(z_grid.shape) == 1:
@@ -26,31 +26,32 @@ def cde_loss(cde_estimates, z_grid, z_test):
     n_grid_points, feats_grid = z_grid.shape
 
     if n_obs != n_samples:
-        raise ValueError("Number of samples in CDEs should be the same as in z_test."
-                         "Currently %s and %s." % (n_obs, n_samples))
+        raise ValueError(
+            "Number of samples in CDEs should be the same as in z_test."
+            "Currently %s and %s." % (n_obs, n_samples)
+        )
     if n_grid != n_grid_points:
-        raise ValueError("Number of grid points in CDEs should be the same as in z_grid."
-                         "Currently %s and %s." % (n_grid, n_grid_points))
+        raise ValueError(
+            "Number of grid points in CDEs should be the same as in z_grid."
+            "Currently %s and %s." % (n_grid, n_grid_points)
+        )
 
     if feats_samples != feats_grid:
-        raise ValueError("Dimensionality of test points and grid points need to coincise."
-                         "Currently %s and %s." % (feats_samples, feats_grid))
+        raise ValueError(
+            "Dimensionality of test points and grid points need to coincise."
+            "Currently %s and %s." % (feats_samples, feats_grid)
+        )
 
- 
-
-
-    integrals = np.trapz(cde_estimates**2, np.squeeze(z_grid),axis=1)
-    
+    integrals = np.trapz(cde_estimates**2, np.squeeze(z_grid), axis=1)
 
     nn_ids = np.argmin(np.abs(z_grid - z_test.T), axis=0)
     likeli = cde_estimates[(tuple(np.arange(n_samples)), tuple(nn_ids))]
 
     losses = integrals - 2 * likeli
     loss = np.mean(losses)
-    se_error = np.std(losses, axis=0) / (n_obs ** 0.5)
+    se_error = np.std(losses, axis=0) / (n_obs**0.5)
 
     return loss, se_error
-
 
 
 def normalize(cde_estimates, x_grid, tol=1e-6, max_iter=200):
@@ -146,42 +147,45 @@ def anderson_darling_statistic(cdf_test, cdf_ref, n_tot=1):
     return np.sqrt(ad2)
 
 
-def get_pit(cdes: np.ndarray, z_grid: np.ndarray, z_test: np.ndarray) -> np.ndarray:
+def probability_integral_transform(cde: np.ndarray, y_grid: np.ndarray, y_test: np.ndarray) -> np.ndarray:
     """
-    Calculates PIT based on CDE
+    Calculates the Probability Integral Transform (PIT) based on Conditional Density Estimates (CDE).
 
-    cdes: a numpy array of conditional density estimates;
-        each row corresponds to an observation, each column corresponds to a grid
-        point
-    z_grid: a numpy array of the grid points at which cde_estimates is evaluated
-    z_test: a numpy array of the true z values corresponding to the rows of cde_estimates
+    Args:
+        cde (np.ndarray): A numpy array of conditional density estimates.
+            Each row corresponds to an observation, each column corresponds to a grid point.
+        y_grid (np.ndarray): A numpy array of the grid points at which cde is evaluated.
+        y_test (np.ndarray): A numpy array of the true y values corresponding to the rows of cde.
 
-    returns: A numpy array of values
+    Returns:
+        np.ndarray: A numpy array of PIT values.
+
+    Raises:
+        ValueError: If the number of samples in cde is not the same as in y_test,
+            or if the number of grid points in cde is not the same as in y_grid.
 
     """
     # flatten the input arrays to 1D
-    z_grid = np.ravel(z_grid)
-    z_test = np.ravel(z_test)
+    y_grid = np.ravel(y_grid)
+    y_test = np.ravel(y_test)
 
     # Sanity checks
-    nrow_cde, ncol_cde = cdes.shape
-    n_samples = z_test.shape[0]
-    n_grid_points = z_grid.shape[0]
+    nrow_cde, ncol_cde = cde.shape
+    n_samples = y_test.shape[0]
+    n_grid_points = y_grid.shape[0]
 
     if nrow_cde != n_samples:
         raise ValueError(
-            "Number of samples in CDEs should be the same as in z_test."
-            "Currently %s and %s." % (nrow_cde, n_samples)
+            f"Number of samples in CDEs should be the same as in z_test. Currently {nrow_cde} and {n_samples}."
         )
     if ncol_cde != n_grid_points:
         raise ValueError(
-            "Number of grid points in CDEs should be the same as in z_grid."
-            "Currently %s and %s." % (nrow_cde, n_grid_points)
+            f"Number of grid points in CDEs should be the same as in z_grid. Currently {nrow_cde} and {n_grid_points}."
         )
 
     # Vectorized implementation using masked arrays
-    pit = np.ma.masked_array(cdes, (z_grid > z_test[:, np.newaxis]))
-    pit = np.trapz(pit, z_grid)
+    pit = np.ma.masked_array(cde, (y_grid > y_test[:, np.newaxis]))
+    pit = np.trapz(pit, y_grid)
 
     return np.array(pit)
 
