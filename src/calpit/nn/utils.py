@@ -6,10 +6,12 @@ from prettytable import PrettyTable
 
 class RandomDataset(Dataset):
     """
-    A custom dataset class to randomly select data point.
+    A custom dataset class to randomly select a data point.
     The data point is prepended with a random value between
-    0 and 1 from a Uniform distribution. The data set can be
-    oversampled by a factor.
+    0 and 1 from a Uniform distribution (coverage parameter).
+    The target value is 0 if Y value is less than or equal to
+    the coverage parameter and 1 otherwise.
+    The data set can be oversampled by a given factor.
 
     Args:
         X (list or array-like): The input features.
@@ -33,8 +35,8 @@ class RandomDataset(Dataset):
     def __getitem__(self, idx):
         alpha = torch.rand(1)
         feature = torch.hstack((alpha, torch.Tensor(self.x_data[idx % self.len_x])))
-        target = self.y_data[idx % self.len_x]
-        return feature, torch.squeeze(torch.Tensor([target]))
+        target = (self.y_data[idx % self.len_x] <= alpha).float()
+        return feature, target
 
 
 def count_parameters(model):
