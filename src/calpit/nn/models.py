@@ -7,16 +7,16 @@ class MLP(nn.Module):
 
     Args:
         input_dim (int): The number of input features.
-        output_dim (int): The number of output units.
         hidden_layers (list): A list of integers representing the number of units in each hidden layer.
-        sigmoid (bool): Whether to apply a sigmoid activation function to the output layer.
+        output_dim (int): The number of output units. Defaults to 1.
+        sigmoid (bool): Whether to apply a sigmoid activation function to the output layer. Defaults to True.
 
     Methods:
         forward(x): Performs a forward pass through the MLP.
 
     """
 
-    def __init__(self, input_dim=6, output_dim=1, hidden_layers=[512, 512, 512], sigmoid=False):
+    def __init__(self, input_dim, hidden_layers, output_dim=1, sigmoid=True):
         super().__init__()
         self.all_layers = [input_dim]
         self.all_layers.extend(hidden_layers)
