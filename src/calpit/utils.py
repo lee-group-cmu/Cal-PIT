@@ -3,48 +3,48 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
-def cde_loss(cde_estimates, z_grid, z_test):
+def cde_loss(cde_estimates: np.ndarray, y_grid: np.ndarray, y_test: np.ndarray) -> tuple:
     """
-    Calculates conditional density estimation loss on holdout data
+    Calculates conditional density estimation loss on holdout data.
 
-    @param cde_estimates: a numpy array where each row is a density
-    estimate on z_grid
-    @param z_grid: a numpy array of the grid points at which cde_estimates is evaluated
-    @param z_test: a numpy array of the true z values corresponding to the rows of cde_estimates
+    Args:
+        cde_estimates (numpy.array): An array where each row is a density estimate on y_grid.
+        z_grid (numpy.array): An array of the grid points at which cde_estimates is evaluated.
+        z_test (numpy.array): An array of the true y values corresponding to the rows of cde_estimates.
 
-    @returns The CDE loss (up to a constant) for the CDE estimator on
-    the holdout data and the SE error
+    Returns:
+        tuple: A tuple containing the loss and the standard error of the loss.
+
+    Raises:
+        ValueError: If the dimensions of the input tensors are not compatible.
     """
 
-    if len(z_test.shape) == 1:
-        z_test = z_test.reshape(-1, 1)
-    if len(z_grid.shape) == 1:
-        z_grid = z_grid.reshape(-1, 1)
+    if len(y_test.shape) == 1:
+        y_test = y_test.reshape(-1, 1)
+    if len(y_grid.shape) == 1:
+        y_grid = y_grid.reshape(-1, 1)
 
     n_obs, n_grid = cde_estimates.shape
-    n_samples, feats_samples = z_test.shape
-    n_grid_points, feats_grid = z_grid.shape
+    n_samples, feats_samples = y_test.shape
+    n_grid_points, feats_grid = y_grid.shape
 
     if n_obs != n_samples:
         raise ValueError(
-            "Number of samples in CDEs should be the same as in z_test."
-            "Currently %s and %s." % (n_obs, n_samples)
+            f"Number of samples in CDEs should be the same as in z_test.Currently {n_obs} and {n_samples}."
         )
     if n_grid != n_grid_points:
         raise ValueError(
-            "Number of grid points in CDEs should be the same as in z_grid."
-            "Currently %s and %s." % (n_grid, n_grid_points)
+            f"Number of grid points in CDEs should be the same as in z_grid. Currently {n_grid} and {n_grid_points}."
         )
 
     if feats_samples != feats_grid:
         raise ValueError(
-            "Dimensionality of test points and grid points need to coincise."
-            "Currently %s and %s." % (feats_samples, feats_grid)
+            f"Dimensionality of test points and grid points need to coincise. Currently {feats_samples} and {feats_grid}."
         )
 
-    integrals = np.trapz(cde_estimates**2, np.squeeze(z_grid), axis=1)
+    integrals = np.trapz(cde_estimates**2, np.squeeze(y_grid), axis=1)
 
-    nn_ids = np.argmin(np.abs(z_grid - z_test.T), axis=0)
+    nn_ids = np.argmin(np.abs(y_grid - y_test.T), axis=0)
     likeli = cde_estimates[(tuple(np.arange(n_samples)), tuple(nn_ids))]
 
     losses = integrals - 2 * likeli
@@ -54,43 +54,37 @@ def cde_loss(cde_estimates, z_grid, z_test):
     return loss, se_error
 
 
-def normalize(cde_estimates, x_grid, tol=1e-6, max_iter=200):
-    """Normalizes conditional density estimates to be non-negative and
-    integrate to one.
+def normalize(
+    cde_estimates: np.ndarray, y_grid: np.ndarray, tol: float = 1e-6, max_iter: int = 200
+) -> np.ndarray:
+    """
+    Normalizes conditional density estimates to be non-negative and integrate to one.
 
-    :param cde_estimates: a numpy array or matrix of conditional density estimates.
-    :param tol: float, the tolerance to accept for abs(area - 1).
-    :param max_iter: int, the maximal number of search iterations.
-    :returns: the normalized conditional density estimates.
-    :rtype: numpy array or matrix.
+    Args:
+        cde_estimates (numpy.ndarray): A numpy array or matrix of conditional density estimates.
+        x_grid (numpy.ndarray): The array of grid points.
+        tol (float): The tolerance to accept for abs(area - 1).
+        max_iter (int): The maximal number of search iterations.
+
+    Returns:
+        numpy.ndarray: The normalized conditional density estimates.
 
     """
     if cde_estimates.ndim == 1:
-        normalized_cde = _normalize(cde_estimates, x_grid, tol, max_iter)
+        normalized_cde = _normalize(cde_estimates, y_grid, tol, max_iter)
     else:
-        normalized_cde = np.apply_along_axis(_normalize, 1, cde_estimates, x_grid, tol=tol, max_iter=max_iter)
+        normalized_cde = np.apply_along_axis(_normalize, 1, cde_estimates, y_grid, tol=tol, max_iter=max_iter)
     return normalized_cde
 
 
-def _normalize(density, x_grid, tol=1e-6, max_iter=500):
-    """Normalizes a density estimate to be non-negative and integrate to
-    one.
-
-    :param density: a numpy array of density estimates.
-    :param z_grid: an array, the grid points at the density is estimated.
-    :param tol: float, the tolerance to accept for abs(area - 1).
-    :param max_iter: int, the maximal number of search iterations.
-    :returns: the normalized density estimate.
-    :rtype: numpy array.
-
-    """
+def _normalize(density, y_grid, tol=1e-6, max_iter=500):
     hi = np.max(density)
     lo = 0.0
 
-    area = np.trapz(np.maximum(density, 0.0), x_grid)
+    area = np.trapz(np.maximum(density, 0.0), y_grid)
     if area == 0.0:
         # replace with uniform if all negative density
-        density[:] = 1 / (x_grid.max() - x_grid.min())
+        density[:] = 1 / (y_grid.max() - y_grid.min())
     elif area < 1:
         density /= area
         density[density < 0.0] = 0.0
@@ -98,7 +92,7 @@ def _normalize(density, x_grid, tol=1e-6, max_iter=500):
 
     for _ in range(max_iter):
         mid = (hi + lo) / 2
-        area = np.trapz(np.maximum(density - mid, 0.0), x_grid)
+        area = np.trapz(np.maximum(density - mid, 0.0), y_grid)
         if abs(1.0 - area) <= tol:
             break
         if area < 1.0:
@@ -113,20 +107,34 @@ def _normalize(density, x_grid, tol=1e-6, max_iter=500):
     return density
 
 
-def kolmogorov_smirnov_statistic(cdf_test, cdf_ref):
+def kolmogorov_smirnov_statistic(cdf_test: np.ndarray, cdf_ref: np.ndarray) -> np.ndarray:
     """
-    cdf_test: CDF of the test distribution (array)
-    cdf_ref: CDF of the reference distribution on the same grid (array)
+    Calculate the Kolmogorov-Smirnov statistic between two cumulative distribution functions (CDFs).
+
+    Parameters:
+    cdf_test (np.ndarray): CDF of the test distribution.
+    cdf_ref (np.ndarray): CDF of the reference distribution on the same grid.
+
+    Returns:
+    np.ndarray: The Kolmogorov-Smirnov statistic.
+
     """
     ks = np.max(np.abs(cdf_test - cdf_ref), axis=-1)
 
     return ks
 
 
-def cramer_von_mises(cdf_test, cdf_ref):
+def cramer_von_mises(cdf_test: np.ndarray, cdf_ref: np.ndarray) -> np.ndarray:
     """
-    cdf_test: CDF of the test distribution (1D array)
-    cdf_ref: CDF of the reference distribution on the same grid (1D array)
+    Calculates the Cramer-von Mises statistic between two cumulative distribution functions (CDFs).
+
+    Args:
+        cdf_test (np.ndarray): CDF of the test distribution.
+        cdf_ref (np.ndarray): CDF of the reference distribution on the same grid.
+
+    Returns:
+        np.ndarray: The Cramer-von Mises statistic.
+
     """
     diff = (cdf_test - cdf_ref) ** 2
 
@@ -134,11 +142,18 @@ def cramer_von_mises(cdf_test, cdf_ref):
     return np.sqrt(cvm2)
 
 
-def anderson_darling_statistic(cdf_test, cdf_ref, n_tot=1):
+def anderson_darling_statistic(cdf_test: np.ndarray, cdf_ref: np.ndarray, n_tot: int = 1) -> np.ndarray:
     """
-    cdf_test: CDF of the test distribution (1D array)
-    cdf_ref: CDF of the reference distribution on the same grid (1D array)
-    n_tot:Scaling factor equal to the number of PDFs used to construct ECDF
+    Calculates the Anderson-Darling statistic between two cumulative distribution functions (CDFs).
+
+    Args:
+        cdf_test (np.ndarray): CDF of the test distribution (1D array).
+        cdf_ref (np.ndarray): CDF of the reference distribution on the same grid (1D array).
+        n_tot (int): Scaling factor equal to the number of PDFs used to construct ECDF.
+
+    Returns:
+        np.ndarray: The Anderson-Darling statistic.
+
     """
     num = (cdf_test - cdf_ref) ** 2
     den = cdf_ref * (1 - cdf_ref)
@@ -188,6 +203,24 @@ def probability_integral_transform(cde: np.ndarray, y_grid: np.ndarray, y_test: 
     pit = np.trapz(pit, y_grid)
 
     return np.array(pit)
+
+
+def trapz_grid(y: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """
+    Does trapezoid integration between the same limits as the grid.
+
+    Args:
+        y (np.ndarray): The array of values to integrate.
+        x (np.ndarray): The array of grid points.
+
+    Returns:
+        np.ndarray: The integrated values.
+
+    """
+    dx = np.diff(x)
+    trapz_area = dx * (y[:, 1:] + y[:, :-1]) / 2
+    integral = np.cumsum(trapz_area, axis=-1)
+    return np.hstack((np.zeros(len(integral))[:, None], integral))
 
 
 def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
@@ -259,13 +292,3 @@ def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
         ax[1].text(0.05, 0.78, f"AD:  ${ad:.2f} $", fontsize=15)
 
     return fig, ax
-
-
-def trapz_grid(y, x):
-    """
-    Does trapezoid integration between the same limits as the grid.
-    """
-    dx = np.diff(x)
-    trapz_area = dx * (y[:, 1:] + y[:, :-1]) / 2
-    integral = np.cumsum(trapz_area, axis=-1)
-    return np.hstack((np.zeros(len(integral))[:, None], integral))

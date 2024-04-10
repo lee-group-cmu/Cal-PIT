@@ -39,7 +39,7 @@ class RandomDataset(Dataset):
         return feature, target
 
 
-def count_parameters(model):
+def count_parameters(model: torch.nn.Module) -> int:
     """
     Count the number of trainable parameters in a model.
     """
@@ -110,9 +110,22 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 
-def cde_loss(cde_estimates, y_grid, y_test):
+def cde_loss(cde_estimates: torch.Tensor, y_grid: torch.Tensor, y_test: torch.Tensor) -> tuple:
     """
-    A pytorch implementation of the CDE loss function.
+    Calculates conditional density estimation loss on holdout data.
+    This is a PyTorch version of the original function.
+
+    Args:
+        cde_estimates (torch.Tensor): An array where each row is a density estimate on y_grid
+        y_grid (torch.Tensor): An array of the grid points at which cde_estimates is evaluated.
+        y_test (torch.Tensor): An array of the true y values corresponding to the rows of cde_estimates
+
+    Returns:
+        tuple: A tuple containing the loss and the standard error of the loss.
+
+    Raises:
+        ValueError: If the dimensions of the input tensors are not compatible.
+
     """
     if len(z_test.shape) == 1:
         z_test = z_test.reshape(-1, 1)
