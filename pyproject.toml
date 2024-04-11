@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.urls]
-"Source Code" = "https://github.com/lee-group-cmu/calpit"
+"Source Code" = "https://github.com/lee-group-cmu/Cal-PIT"
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]

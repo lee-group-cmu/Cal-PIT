@@ -1,3 +1,3 @@
-# from .diagnostics_and_calibration import CalPit
+from .diagnostics_and_calibration import CalPit
 
-# __all__ = ["CalPit"]
+__all__ = ["CalPit"]
