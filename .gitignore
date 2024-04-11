@@ -138,7 +138,7 @@ dask-worker-space/
 
 # tmp directory
 tmp/
-experiments/
+
 
 
 # Mac OS
@@ -147,6 +147,7 @@ experiments/
 # results
 _results/
 _html/
+experiments/
 
 # Project initialization script
 .initialize_new_project.sh
