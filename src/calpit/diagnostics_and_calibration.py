@@ -7,7 +7,7 @@ from tqdm import trange
 
 from calpit.nn.models import MLP
 from calpit.nn.utils import count_parameters, RandomDataset, EarlyStopping
-from calpit.utils import probability_integral_transform
+from calpit.metrics import probability_integral_transform
 
 
 class CalPit:
@@ -212,6 +212,6 @@ class CalPit:
         raise NotImplementedError
         return 0
 
-    def fit_transform():
+    def fit_transform(self, x_test, y_grid):
         raise NotImplementedError
         return 0
