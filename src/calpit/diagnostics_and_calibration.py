@@ -101,7 +101,37 @@ class CalPitModel:
         return self.model
 
     def predict_pit(self, X_test, n_gamma, gamma_grid):
-        pass
+        trainer = Trainer(gpus=1, ...) 
+        model = plModel.load_from_checkpoint('lightning_logs/version_0/checkpoints/model_epoch=17_val_loss=95.99.ckpt')
+        # not needed
+        # model.eval()
+
+        trainer.test(model, test_dataloaders)
+
+        # move the rest to the LightningModule:
+
+        class PLModel: 
+
+        def __init__(self, ...)
+        self.accuracy = pl.metrics.Accuracy()        
+
+        def test_step(self, batch, batch_idx)
+            data = batch
+            correct_count = 0
+            nsample = len(test_loader)
+            output = self(data['x'])
+            label = data['label'].data.cpu().numpy()  # optimize this and use torch operations on the gpu instead of numpy
+            
+            # pred = nn.functional.softmax(output, dim=1)
+            # pred = np.argmax(pred.data.cpu().numpy(), axis = 1) 
+
+            # use the Metrics [1] package instead, you can directly feed it logits
+            # and it correctly works across multiple gpus should you need that.
+            self.accuracy(output, label)
+
+    def test_epoch_end(self, outputs):
+        # log or print
+        self.log('test_accuracy', self.accuracy.compute())
 
     def predict_cde(self, X_test, y_grid, n_grid):
         pass
