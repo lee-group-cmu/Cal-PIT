@@ -27,6 +27,7 @@ def normalize(
 
 
 def _normalize(density, y_grid, tol=1e-6, max_iter=500):
+    # TODO: Use an alternate root finding method to vectorize this
     hi = np.max(density)
     lo = 0.0
 
