@@ -16,6 +16,12 @@ classifiers = [
 dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
+"numpy",
+"scipy",
+"prettytable",
+"torch",
+"torchvision",
+"tqdm",
 ]
 
 [project.urls]
@@ -24,7 +30,7 @@ dependencies = [
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
 dev = [
-    "asv==0.6.1", # Used to compute performance benchmarks
+    "asv==0.6.3", # Used to compute performance benchmarks
     "black", # Used for static linting of files
     "jupyter", # Clears output from Jupyter notebooks
     "mypy", # Used for static type checking of files
