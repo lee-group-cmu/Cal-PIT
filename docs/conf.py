@@ -36,6 +36,9 @@ extensions.append("sphinx_copybutton")
 copybutton_exclude = ".linenos, .gp"
 copybutton_prompt_text = ">> "
 
+extensions.append("sphinxcontrib.bibtex")
+bibtex_bibfiles = ["refs.bib"]
+
 ## lets us suppress the copy button on select code blocks.
 copybutton_selector = "div:not(.no-copybutton) > div.highlight > pre"
 
@@ -56,3 +59,5 @@ autoapi_add_toc_tree_entry = False
 autoapi_member_order = "bysource"
 
 html_theme = "sphinx_rtd_theme"
+# Exclude checkpoint and build files from sphinx
+exclude_patterns = ["_build", "**.ipynb_checkpoints"]
