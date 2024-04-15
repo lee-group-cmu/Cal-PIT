@@ -4,8 +4,33 @@
 
 Welcome to `calpit`'s documentation!
 ========================================================================================
+
+
 Overview
 ---------------------------
+
+`calpit` is a Python package for diagnosing and recalibrating conditional density estimates. The package is built on top of Pytorch (with other ML backends to be added soon) and provides a simple and flexible interface matching the scikit-learn API.
+
+
+Basic Usage
+---------------------------
+The following is a basic recipe for using the `calpit` package:
+
+.. code-block:: python
+
+   from calpit import CalPit #import the CalPit class
+   
+   calpit_model = CalPit(model=model) #Any Pytorch model CalPit class
+   
+   trained_model = calpit_model.fit(x_calib,y_calib, cde_cali,y_grid) #Fit the model with a calibration dataset
+   
+   pp_result = calpit_model.predict(x_test, cov_grid) #Predict the local PIT distribution for a test dataset
+   
+   new_cde = calpit_model.transform(x_test, cde_test, y_grid) #Recalibrate the conditional density estimate for a test dataset
+
+
+
+
 
 Installation
 ---------------------------
@@ -37,13 +62,18 @@ If you would like to install the package for development purposes, you can clone
 
 References
 ---------------------------
-The package is based on the following papers:
-- :cite:t:`Zhao2021Diagnostics` for diagnostics
+The `calpit` package is based on the work described in following papers:
+
+- :cite:t:`Dey2021RecalPhotoz` and :cite:t:`Dey2022Recal` which introduces the recalibration framework for conditional density estimates.
+- :cite:t:`Zhao2021Diagnostics`, which introduces diagnostics for conditional density estimation methods.
+
+
 .. bibliography::
+   :all:
+
 
 .. toctree::
    :hidden:
-
    Home Page <self>
    Examples <notebooks>
    API Reference <autoapi/index>

@@ -3,4 +3,4 @@ Examples
 
 .. toctree::
 
-    Introducing Jupyter Notebooks <notebooks/intro_notebook>
+Example usages of the code will be added soon.

@@ -36,8 +36,11 @@ extensions.append("sphinx_copybutton")
 copybutton_exclude = ".linenos, .gp"
 copybutton_prompt_text = ">> "
 
+# -- sphinxcontrib-bibtex configuration --------------------------------------
 extensions.append("sphinxcontrib.bibtex")
 bibtex_bibfiles = ["refs.bib"]
+bibtex_default_style = "unsrt"
+bibtex_reference_style = "author_year"
 
 ## lets us suppress the copy button on select code blocks.
 copybutton_selector = "div:not(.no-copybutton) > div.highlight > pre"
