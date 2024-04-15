@@ -2,49 +2,49 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to calpit's documentation!
+Welcome to `calpit`'s documentation!
 ========================================================================================
-
-Dev Guide - Getting Started
+Overview
 ---------------------------
 
-Before installing any dependencies or writing code, it's a great idea to create a
-virtual environment. LINCC-Frameworks engineers primarily use `conda` to manage virtual
-environments. If you have conda installed locally, you can run the following to
-create and activate a new environment.
+Installation
+---------------------------
+
+To install the current release of the package, you can run the following command:
 
 .. code-block:: console
 
-   >> conda create env -n <env_name> python=3.10
-   >> conda activate <env_name>
+   >> pip install calpit
 
-
-Once you have created a new environment, you can install this project for local
-development using the following commands:
+To install the latest version of the code from Github, you can run the following command:
 
 .. code-block:: console
 
-   >> pip install -e .'[dev]'
-   >> pre-commit install
-   >> conda install pandoc
+   >> pip install git+https://github.com/lee-group-cmu/Cal-PIT
 
+If you would like to install the package for development purposes, you can clone the repository and install the package in editable mode:
 
-Notes:
+.. code-block:: console
 
-1) The single quotes around ``'[dev]'`` may not be required for your operating system.
-2) ``pre-commit install`` will initialize pre-commit for this local repository, so
-   that a set of tests will be run prior to completing a local commit. For more
-   information, see the Python Project Template documentation on
-   `pre-commit <https://lincc-ppt.readthedocs.io/en/latest/practices/precommit.html>`_.
-3) Installing ``pandoc`` allows you to verify that automatic rendering of Jupyter notebooks
-   into documentation for ReadTheDocs works as expected. For more information, see
-   the Python Project Template documentation on
-   `Sphinx and Python Notebooks <https://lincc-ppt.readthedocs.io/en/latest/practices/sphinx.html#python-notebooks>`_.
+   >> git clone https://github.com/lee-group-cmu/Cal-PIT.git
+   >> cd Cal-PIT
+   >> pip install -e .
 
+.. note::
+
+   - The package is intended for use with Python 3.10 or later.
+   - Pytorch is a required dependency for calpit. Please follow the instructions on the `Pytorch website <https://pytorch.org/get-started/locally/>`_ to install the appropriate version for your system.
+
+References
+---------------------------
+The package is based on the following papers:
+- :cite:t:`Zhao2021Diagnostics` for diagnostics
+.. bibliography::
 
 .. toctree::
    :hidden:
 
-   Home page <self>
+   Home Page <self>
+   Examples <notebooks>
    API Reference <autoapi/index>
-   Notebooks <notebooks>
+   
