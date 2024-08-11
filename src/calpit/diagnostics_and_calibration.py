@@ -16,24 +16,16 @@ from calpit.utils import trapz_grid
 
 
 class CalPIT:
-    def __init__(self, model, input_dim=None, hidden_layers=None, **args):
+    def __init__(self, model: torch.nn.Module) -> None:
         """
         Initializes an instance of the CalPIT Class.
 
         Args:
             model (str or torch.nn.Module): The model to be used to learn the conditional PIT.
             Can be any pytorch model that outputs a value between 0 and 1.
-            A string with the name of an inbuilt can also be provided. Currently supports: `mlp`
-
-            input_dim (int, optional): The input dimension of the model. Defaults to None.
-            hidden_layers (list, optional): A list of hidden layer sizes for the MLP models. Defaults to None.
         """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if model == "mlp":
-            self.model = MLP(input_dim + 1, hidden_layers, 1)
-        else:
-            self.model = model
-
+        self.model = model
         count_parameters(self.model)
 
         self.training_loss = None
