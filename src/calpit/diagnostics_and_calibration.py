@@ -12,10 +12,10 @@ from calpit.metrics import probability_integral_transform
 from calpit.utils import trapz_grid
 
 
-class CalPit:
+class CalPIT:
     def __init__(self, model, input_dim=None, hidden_layers=None, **args):
         """
-        Initializes an instance of the CalPit Class.
+        Initializes an instance of the CalPIT Class.
 
         Args:
             model (str or torch.nn.Module): The model to be used to learn the conditional PIT.
