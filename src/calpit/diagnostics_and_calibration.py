@@ -1,6 +1,9 @@
 from pathlib import Path
+from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
+
 import numpy as np
 import torch
+import lightning as L
 from torch.utils.data import TensorDataset, DataLoader
 from scipy.interpolate import PchipInterpolator
 from tqdm import trange
@@ -27,9 +30,9 @@ class CalPIT:
         """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if model == "mlp":
-            self.model = MLP(input_dim + 1, hidden_layers, 1).to(self.device)
+            self.model = MLP(input_dim + 1, hidden_layers, 1)
         else:
-            self.model = model.to(self.device)
+            self.model = model
 
         count_parameters(self.model)
 
@@ -88,6 +91,8 @@ class CalPIT:
         Returns:
             torch.nn.Module: The trained model.
         """
+        fabric = L.Fabric()
+        fabric.launch()
         # method implementation
         if pit_calib is None:
             if y_calib is None or cde_calib is None or y_grid is None:
@@ -124,14 +129,16 @@ class CalPIT:
 
         # Create Data loader
         train_dataloader = DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        train_dataloader = fabric.setup_dataloaders(train_dataloader)
         valid_dataloader = DataLoader(validset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-
+        valid_dataloader = fabric.setup_dataloaders(valid_dataloader)
         # Initialize the Model and optimizer, etc.
         training_loss = []
         validation_bce = []
 
         # Optimizer
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        self.model, optimizer = fabric.setup(self.model, optimizer)
         # Use lr decay
         schedule_rule = lambda epoch: lr_decay**epoch
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=schedule_rule)
@@ -150,8 +157,6 @@ class CalPIT:
             # Training loop per epoch
             self.model.train()  # prep model for training
             for batch, (feature, target) in enumerate(train_dataloader, start=1):
-                feature = feature.to(self.device)
-                target = target.to(self.device)
 
                 # Zero your gradients for every batch!
                 optimizer.zero_grad()
@@ -163,7 +168,8 @@ class CalPIT:
                 loss_fn = torch.nn.BCELoss(reduction="sum")
                 loss = loss_fn(torch.clamp(torch.squeeze(output), min=0.0, max=1.0), torch.squeeze(target))
 
-                loss.backward()
+                fabric.backward(loss)
+
                 # Adjust learning weights
                 optimizer.step()
 
