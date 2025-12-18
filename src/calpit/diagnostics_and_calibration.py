@@ -21,8 +21,9 @@ class CalPit:
             model (str or torch.nn.Module): The model to be used to learn the conditional PIT.
             Can be any pytorch model that outputs a value between 0 and 1.
         """
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model
+        self.device = next(model.parameters()).device
         count_parameters(self.model)
 
         self.training_loss = None
