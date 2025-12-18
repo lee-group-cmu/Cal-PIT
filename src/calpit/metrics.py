@@ -144,7 +144,7 @@ def probability_integral_transform(cde: np.ndarray, y_grid: np.ndarray, y_test: 
         )
 
     # Vectorized implementation using masked arrays
-    pit = np.ma.masked_array(cde, (y_grid > y_test[:, np.newaxis]))
+    pit = np.ma.masked_array(cde, (y_grid > y_test[:, np.newaxis])) # 1 is masked, 0 is unmasked
     pit = np.trapz(pit, y_grid)
 
     return np.array(pit)
