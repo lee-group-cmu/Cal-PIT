@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import integrate
 
 
 def cde_loss(cde_estimates: np.ndarray, y_grid: np.ndarray, y_test: np.ndarray) -> tuple:
@@ -40,7 +41,7 @@ def cde_loss(cde_estimates: np.ndarray, y_grid: np.ndarray, y_test: np.ndarray) 
             f"Dimensionality of test points and grid points need to coincise. Currently {feats_samples} and {feats_grid}."
         )
 
-    integrals = np.trapz(cde_estimates**2, np.squeeze(y_grid), axis=1)
+    integrals = integrate.trapezoid(cde_estimates**2, np.squeeze(y_grid), axis=1)
 
     nn_ids = np.argmin(np.abs(y_grid - y_test.T), axis=0)
     likeli = cde_estimates[(tuple(np.arange(n_samples)), tuple(nn_ids))]
@@ -83,7 +84,7 @@ def cramer_von_mises_statistic(cdf_test: np.ndarray, cdf_ref: np.ndarray) -> np.
     """
     diff = (cdf_test - cdf_ref) ** 2
 
-    cvm2 = np.trapz(diff, cdf_ref, axis=-1)
+    cvm2 = integrate.trapezoid(diff, cdf_ref, axis=-1)
     return np.sqrt(cvm2)
 
 
@@ -103,7 +104,7 @@ def anderson_darling_statistic(cdf_test: np.ndarray, cdf_ref: np.ndarray, n_tot:
     num = (cdf_test - cdf_ref) ** 2
     den = cdf_ref * (1 - cdf_ref)
 
-    ad2 = n_tot * np.trapz((num / den), cdf_ref, axis=-1)
+    ad2 = n_tot * integrate.trapezoid((num / den), cdf_ref, axis=-1)
     return np.sqrt(ad2)
 
 
@@ -140,11 +141,13 @@ def probability_integral_transform(cde: np.ndarray, y_grid: np.ndarray, y_test: 
         )
     if ncol_cde != n_grid_points:
         raise ValueError(
-            f"Number of grid points in CDEs should be the same as in z_grid. Currently {nrow_cde} and {n_grid_points}."
+            f"Number of grid points in CDEs should be the same as in z_grid. Currently {ncol_cde} and {n_grid_points}."
         )
 
-    # Vectorized implementation using masked arrays
-    pit = np.ma.masked_array(cde, (y_grid > y_test[:, np.newaxis])) # 1 is masked, 0 is unmasked
-    pit = np.trapz(pit, y_grid)
+    # The PIT is the CDF integrated up to the last grid point at or below y_test,
+    # and 0 when y_test lies below the grid.
+    cdf = integrate.cumulative_trapezoid(cde, y_grid, axis=1, initial=0)
+    last_below = np.searchsorted(y_grid, y_test, side="right") - 1
+    pit = cdf[np.arange(n_samples), np.clip(last_below, 0, None)]
 
-    return np.array(pit)
+    return np.where(last_below >= 0, pit, 0.0)

@@ -1,7 +1,10 @@
-from scipy.stats import binom
-from matplotlib import pyplot as plt
 import numpy as np
 import torch
+from scipy import integrate
+from scipy.stats import binom
+
+from calpit import metrics
+
 
 def normalize(
     cde_estimates: np.ndarray, y_grid: np.ndarray, tol: float = 1e-6, max_iter: int = 200
@@ -31,7 +34,7 @@ def _normalize(density, y_grid, tol=1e-6, max_iter=500):
     hi = np.max(density)
     lo = 0.0
 
-    area = np.trapz(np.maximum(density, 0.0), y_grid)
+    area = integrate.trapezoid(np.maximum(density, 0.0), y_grid)
     if area == 0.0:
         # replace with uniform if all negative density
         density[:] = 1 / (y_grid.max() - y_grid.min())
@@ -42,7 +45,7 @@ def _normalize(density, y_grid, tol=1e-6, max_iter=500):
 
     for _ in range(max_iter):
         mid = (hi + lo) / 2
-        area = np.trapz(np.maximum(density - mid, 0.0), y_grid)
+        area = integrate.trapezoid(np.maximum(density - mid, 0.0), y_grid)
         if abs(1.0 - area) <= tol:
             break
         if area < 1.0:
@@ -86,18 +89,35 @@ def trapz_grid_torch(y: torch.tensor, x: torch.tensor) -> torch.tensor:
     
 def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
     """
-    Plots the PIT/HPD histogram and calculates the confidence interval for the bin values,
-    were the PIT/HPD values follow an uniform distribution
+    Plots the PIT histogram and the P-P plot of PIT values against a uniform distribution.
 
-    @param values: a numpy array with PIT/HPD values
-    @param ci_level: a float between 0 and 1 indicating the size of the confidence level
-    @param x_label: a string, populates the x_label of the plot
-    @param n_bins: an integer, the number of bins in the histogram
-    @param figsize: a tuple, the plot size (width, height)
-    @param ylim: a list of two elements, including the lower and upper limit for the y axis
-    @returns The matplotlib figure object with the histogram of the PIT/HPD values
-    and the CI for the uniform distribution
+    The histogram is drawn with the band that a uniform distribution would fall in with
+    probability ci_level. When y_true is given, the P-P plot is annotated with the
+    Kolmogorov-Smirnov, Cramer-von Mises and Anderson-Darling statistics.
+
+    Args:
+        pit_values (np.ndarray): The PIT values, shape (n_samples,).
+        ci_level (float): The confidence level of the uniform band, between 0 and 1.
+        n_bins (int, optional): The number of histogram bins. Defaults to 30.
+        y_true (np.ndarray, optional): The true values; only its length is used, to scale the
+            Anderson-Darling statistic. Defaults to None, which omits the statistics.
+        ax (sequence of matplotlib.axes.Axes, optional): Two axes to draw the histogram and the
+            P-P plot on. Defaults to None, which creates a new figure.
+        **fig_kw: Keyword arguments passed to matplotlib.pyplot.subplots when ax is None.
+
+    Returns:
+        tuple: The matplotlib figure and the array of two axes, as a tuple (fig, ax).
+
+    Raises:
+        ImportError: If matplotlib is not installed.
     """
+    try:
+        from matplotlib import pyplot as plt  # noqa: PLC0415 - optional dependency.
+    except ImportError as error:
+        raise ImportError(
+            "plot_pit requires the optional dependency matplotlib. "
+            "Install it with: pip install 'calpit[plot]'"
+        ) from error
 
     # Extract the number of CDEs
     n = pit_values.shape[0]
@@ -111,6 +131,8 @@ def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
 
     if ax is None:
         fig, ax = plt.subplots(1, 2, **fig_kw)
+    else:
+        fig = ax[0].figure
 
     # plot PIT histogram
     ax[0].hist(pit_values, bins=n_bins)
@@ -129,7 +151,7 @@ def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
 
     # plot P-P plot
     prob_theory = np.linspace(0.01, 0.99, 100)
-    prob_data = [np.sum(pit_values < i) / len(pit_values) for i in prob_theory]
+    prob_data = np.array([np.sum(pit_values < i) / len(pit_values) for i in prob_theory])
     # # plot Q-Q
     # quants = np.linspace(0, 100, 100)
     # quant_theory = quants/100.
@@ -145,9 +167,9 @@ def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
     ax[1].set_xticks(xlabels)
     ax[1].set_aspect("equal")
     if y_true is not None:
-        ks = kolmogorov_smirnov_statistic(prob_data, prob_theory)
-        ad = anderson_darling_statistic(prob_data, prob_theory, len(y_true))
-        cvm = cramer_von_mises(prob_data, prob_theory)
+        ks = metrics.kolmogorov_smirnov_statistic(prob_data, prob_theory)
+        ad = metrics.anderson_darling_statistic(prob_data, prob_theory, len(y_true))
+        cvm = metrics.cramer_von_mises_statistic(prob_data, prob_theory)
         ax[1].text(0.05, 0.9, f"KS:  ${ks:.3f} $", fontsize=15)
         ax[1].text(0.05, 0.84, f"CvM:  ${cvm:.3f} $", fontsize=15)
         ax[1].text(0.05, 0.78, f"AD:  ${ad:.2f} $", fontsize=15)

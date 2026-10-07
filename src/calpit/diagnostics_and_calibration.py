@@ -5,8 +5,6 @@ from torch.utils.data import TensorDataset, DataLoader
 from scipy.interpolate import PchipInterpolator
 from tqdm import trange
 
-
-from calpit.nn.models import MLP
 from calpit.nn.utils import count_parameters, RandomDataset, EarlyStopping
 from calpit.metrics import probability_integral_transform
 from calpit.utils import trapz_grid

@@ -16,12 +16,11 @@ classifiers = [
 dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
-"numpy",
-"scipy",
-"prettytable",
-"torch",
-"torchvision",
-"tqdm",
+    "numpy",
+    "prettytable",
+    "scipy>=1.6", # scipy.integrate.trapezoid
+    "torch",
+    "tqdm",
 ]
 
 [project.urls]
@@ -29,7 +28,20 @@ dependencies = [
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
+spline = [
+    "spline-basis", # Used by calpit.nn.IsplineNN
+]
+hdf5 = [
+    "h5py", # Used by calpit.datasets.PhotometryDataset
+]
+plot = [
+    "matplotlib", # Used by calpit.utils.plot_pit
+]
+all = [
+    "calpit[spline,hdf5,plot]",
+]
 dev = [
+    "calpit[all]",
     "asv==0.6.3", # Used to compute performance benchmarks
     "black", # Used for static linting of files
     "jupyter", # Clears output from Jupyter notebooks

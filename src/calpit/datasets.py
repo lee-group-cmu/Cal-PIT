@@ -1,8 +1,10 @@
-import numpy as np
-from torch.utils.data import Dataset
-import h5py
-import torch
 from pathlib import Path
+
+import numpy as np
+import torch
+from torch.utils.data import Dataset
+
+from calpit.nn import utils as nn_utils
 
 class TuningFork:
     def __init__(self, dims=3, lam=3, seed=299792458):
@@ -34,44 +36,21 @@ class TuningFork:
         return X_data, Y_data
 
 
-class RandomDataset(Dataset):
-    """
-    A custom dataset class to randomly select a data point.
-    The data point is prepended with a random value between
-    0 and 1 from a Uniform distribution (coverage parameter).
-    The target value is 0 if Y value is less than or equal to
-    the coverage parameter and 1 otherwise.
-    The data set can be oversampled by a given factor.
+# Kept for backwards compatibility; the implementation lives in calpit.nn.utils.
+RandomDataset = nn_utils.RandomDataset
 
-    Args:
-        X (list or array-like): The input features.
-        Y (list or array-like): The target values.
-        oversample (float, optional): The oversampling factor. Defaults to 1.
 
-    Returns:
-        tuple: A tuple containing the input feature and target value.
-
-    """
-
-    def __init__(self, x_data, y_data, oversample=1):
-        self.x_data = x_data
-        self.y_data = y_data
-        self.len_x = len(x_data)
-        self.oversample = oversample
-
-    def __len__(self):
-        return int(len(self.x_data) * self.oversample)
-
-    def __getitem__(self, idx):
-        alpha = torch.rand(1)
-        feature = torch.hstack((alpha, torch.Tensor(self.x_data[idx % self.len_x])))
-        target = (self.y_data[idx % self.len_x] <= alpha).float()
-        return feature, target
-        
 class PhotometryDataset(Dataset):
     def __init__(self, file_path=None, pit=None, scaler=None):
         self.pit = pit
         self.scaler = scaler
+        try:
+            import h5py  # noqa: PLC0415 - optional dependency.
+        except ImportError as error:
+            raise ImportError(
+                "PhotometryDataset requires the optional dependency h5py. "
+                "Install it with: pip install 'calpit[hdf5]'"
+            ) from error
         if Path(file_path).suffix == '.hdf5':
             self.file = h5py.File(file_path, 'r')
 

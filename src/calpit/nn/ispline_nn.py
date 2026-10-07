@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from splinebasis import ISplineBasis
 
 
 class ISplineLayer(nn.Module):
@@ -9,8 +8,17 @@ class ISplineLayer(nn.Module):
         self.in_features = in_features
         self.num_basis = num_basis
         self.coefs = nn.Sequential(nn.Linear(in_features, num_basis), nn.Softmax(dim=-1),nn.Dropout(p=dropout_p))
+        # Imported here so that calpit installs and imports without the optional
+        # spline-basis dependency; only IsplineNN needs it.
+        try:
+            import splinebasis  # noqa: PLC0415 - optional dependency.
+        except ImportError as error:
+            raise ImportError(
+                "IsplineNN requires the optional dependency spline-basis. "
+                "Install it with: pip install 'calpit[spline]'"
+            ) from error
         self.grid = torch.linspace(0, 1, 1000)
-        self.basis_vectors = ISplineBasis(
+        self.basis_vectors = splinebasis.ISplineBasis(
             order=3, num_basis=num_basis, lower=0, upper=1, grid=self.grid
         ).basis_vectors
         self.basis_vectors = torch.from_numpy(self.basis_vectors)
