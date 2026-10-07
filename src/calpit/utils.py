@@ -77,16 +77,17 @@ def trapz_grid(y: np.ndarray, x: np.ndarray) -> np.ndarray:
     integral = np.cumsum(trapz_area, axis=-1)
     return np.hstack((np.zeros(len(integral))[:, None], integral))
 
+
 def trapz_grid_torch(y: torch.tensor, x: torch.tensor) -> torch.tensor:
     """
     Same as trapz_grid but implemented in Pytorch
     """
     dx = torch.diff(x)
-    trapz_area = dx * (y[:,1:] + y[:,:-1]) / 2
+    trapz_area = dx * (y[:, 1:] + y[:, :-1]) / 2
     integral = torch.cumsum(trapz_area, axis=-1)
-    return torch.hstack((torch.zeros(len(integral), device=x.device)[:,None], integral))
+    return torch.hstack((torch.zeros(len(integral), device=x.device)[:, None], integral))
 
-    
+
 def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
     """
     Plots the PIT histogram and the P-P plot of PIT values against a uniform distribution.

@@ -1,7 +1,7 @@
-import torch
 import numpy as np
-from torch.utils.data import Dataset
+import torch
 from prettytable import PrettyTable
+from torch.utils.data import Dataset
 
 
 class RandomDataset(Dataset):

@@ -1,12 +1,13 @@
 from pathlib import Path
+
 import numpy as np
 import torch
-from torch.utils.data import TensorDataset, DataLoader
 from scipy.interpolate import PchipInterpolator
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import trange
 
-from calpit.nn.utils import count_parameters, RandomDataset, EarlyStopping
 from calpit.metrics import probability_integral_transform
+from calpit.nn.utils import EarlyStopping, RandomDataset, count_parameters
 from calpit.utils import trapz_grid
 
 
@@ -19,7 +20,7 @@ class CalPit:
             model (str or torch.nn.Module): The model to be used to learn the conditional PIT.
             Can be any pytorch model that outputs a value between 0 and 1.
         """
-        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model
         self.device = next(model.parameters()).device
         count_parameters(self.model)
@@ -165,7 +166,6 @@ class CalPit:
             self.model.eval()  # prep model for evaluation
 
             for feature, target in valid_dataloader:
-
                 feature = feature.to(self.device)
                 target = target.to(self.device)
 

@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 
 from calpit.nn import utils as nn_utils
 
+
 class TuningFork:
     def __init__(self, dims=3, lam=3, seed=299792458):
         self.dims = dims
@@ -51,17 +52,17 @@ class PhotometryDataset(Dataset):
                 "PhotometryDataset requires the optional dependency h5py. "
                 "Install it with: pip install 'calpit[hdf5]'"
             ) from error
-        if Path(file_path).suffix == '.hdf5':
-            self.file = h5py.File(file_path, 'r')
+        if Path(file_path).suffix == ".hdf5":
+            self.file = h5py.File(file_path, "r")
 
     def __len__(self):
         key = list(self.file.keys())[0]
         return len(self.file[key])
 
     def __getitem__(self, idx):
-        x = self.file['dered_color_features'][idx]
+        x = self.file["dered_color_features"][idx]
         if self.scaler:
-            x = self.scaler.transform(x.reshape(1,-1))
+            x = self.scaler.transform(x.reshape(1, -1))
         x = torch.tensor(x.squeeze())
         y = torch.tensor(self.pit[idx])
 
@@ -70,5 +71,3 @@ class PhotometryDataset(Dataset):
         target = (y <= alpha).float()
 
         return feature, target
-        
-        

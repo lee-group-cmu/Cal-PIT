@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 from .NeuralIntegral import NeuralIntegral  # noqa
 from .ParallelNeuralIntegral import ParallelNeuralIntegral
 
