@@ -41,6 +41,17 @@ To install the current release of the package, you can run the following command
 
    >> pip install calpit
 
+Some features need optional dependencies, which you can install as extras:
+
+- ``spline`` installs ``spline-basis``, needed for ``calpit.nn.IsplineNN``.
+- ``hdf5`` installs ``h5py``, needed for ``calpit.datasets.PhotometryDataset``.
+- ``plot`` installs ``matplotlib``, needed for ``calpit.utils.plot_pit``.
+- ``all`` installs all of the above.
+
+.. code-block:: console
+
+   >> pip install 'calpit[all]'
+
 To install the latest version of the code from Github, you can run the following command:
 
 .. code-block:: console
