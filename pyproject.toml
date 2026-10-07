@@ -42,7 +42,6 @@ all = [
 ]
 dev = [
     "calpit[all]",
-    "asv==0.6.3", # Used to compute performance benchmarks
     "black", # Used for static linting of files
     "jupyter", # Clears output from Jupyter notebooks
     "mypy", # Used for static type checking of files
