@@ -84,7 +84,13 @@ class EarlyStopping:
         self.trace_func = trace_func
 
     def __call__(self, val_loss, model):
+        """
+        Records an epoch's validation loss and checkpoints the model if it improved.
 
+        Args:
+            val_loss (float): The validation loss of the epoch.
+            model (torch.nn.Module): The model to checkpoint.
+        """
         score = -val_loss
 
         if self.best_score is None:
@@ -138,16 +144,18 @@ def cde_loss(cde_estimates: torch.Tensor, y_grid: torch.Tensor, y_test: torch.Te
 
     if n_obs != n_samples:
         raise ValueError(
-            f"Number of samples in CDEs should be the same as in z_test.Currently {n_obs} and {n_samples}."
+            f"Number of samples in CDEs should be the same as in y_test. Currently {n_obs} and {n_samples}."
         )
     if n_grid != n_grid_points:
         raise ValueError(
-            f"Number of grid points in CDEs should be the same as in z_grid. Currently {n_grid} and {n_grid_points}."
+            "Number of grid points in CDEs should be the same as in y_grid. "
+            f"Currently {n_grid} and {n_grid_points}."
         )
 
     if feats_samples != feats_grid:
         raise ValueError(
-            f"Dimensionality of test points and grid points need to coincise. Currently {feats_samples} and {feats_grid}."
+            "Dimensionality of test points and grid points need to coincide. "
+            f"Currently {feats_samples} and {feats_grid}."
         )
 
     integrals = torch.trapezoid(cde_estimates**2, torch.squeeze(y_grid), dim=1)

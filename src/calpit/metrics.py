@@ -8,8 +8,8 @@ def cde_loss(cde_estimates: np.ndarray, y_grid: np.ndarray, y_test: np.ndarray) 
 
     Args:
         cde_estimates (numpy.array): An array where each row is a density estimate on y_grid.
-        z_grid (numpy.array): An array of the grid points at which cde_estimates is evaluated.
-        z_test (numpy.array): An array of the true y values corresponding to the rows of cde_estimates.
+        y_grid (numpy.array): An array of the grid points at which cde_estimates is evaluated.
+        y_test (numpy.array): An array of the true y values corresponding to the rows of cde_estimates.
 
     Returns:
         tuple: A tuple containing the loss and the standard error of the loss.
@@ -29,16 +29,18 @@ def cde_loss(cde_estimates: np.ndarray, y_grid: np.ndarray, y_test: np.ndarray) 
 
     if n_obs != n_samples:
         raise ValueError(
-            f"Number of samples in CDEs should be the same as in z_test.Currently {n_obs} and {n_samples}."
+            f"Number of samples in CDEs should be the same as in y_test. Currently {n_obs} and {n_samples}."
         )
     if n_grid != n_grid_points:
         raise ValueError(
-            f"Number of grid points in CDEs should be the same as in z_grid. Currently {n_grid} and {n_grid_points}."
+            "Number of grid points in CDEs should be the same as in y_grid. "
+            f"Currently {n_grid} and {n_grid_points}."
         )
 
     if feats_samples != feats_grid:
         raise ValueError(
-            f"Dimensionality of test points and grid points need to coincise. Currently {feats_samples} and {feats_grid}."
+            "Dimensionality of test points and grid points need to coincide. "
+            f"Currently {feats_samples} and {feats_grid}."
         )
 
     integrals = integrate.trapezoid(cde_estimates**2, np.squeeze(y_grid), axis=1)
@@ -57,12 +59,12 @@ def kolmogorov_smirnov_statistic(cdf_test: np.ndarray, cdf_ref: np.ndarray) -> n
     """
     Calculate the Kolmogorov-Smirnov statistic between two cumulative distribution functions (CDFs).
 
-    Parameters:
-    cdf_test (np.ndarray): CDF of the test distribution.
-    cdf_ref (np.ndarray): CDF of the reference distribution on the same grid.
+    Args:
+        cdf_test (np.ndarray): CDF of the test distribution.
+        cdf_ref (np.ndarray): CDF of the reference distribution on the same grid.
 
     Returns:
-    np.ndarray: The Kolmogorov-Smirnov statistic.
+        np.ndarray: The Kolmogorov-Smirnov statistic.
 
     """
     ks = np.max(np.abs(cdf_test - cdf_ref), axis=-1)
@@ -137,11 +139,13 @@ def probability_integral_transform(cde: np.ndarray, y_grid: np.ndarray, y_test: 
 
     if nrow_cde != n_samples:
         raise ValueError(
-            f"Number of samples in CDEs should be the same as in z_test. Currently {nrow_cde} and {n_samples}."
+            "Number of samples in CDEs should be the same as in y_test. "
+            f"Currently {nrow_cde} and {n_samples}."
         )
     if ncol_cde != n_grid_points:
         raise ValueError(
-            f"Number of grid points in CDEs should be the same as in z_grid. Currently {ncol_cde} and {n_grid_points}."
+            "Number of grid points in CDEs should be the same as in y_grid. "
+            f"Currently {ncol_cde} and {n_grid_points}."
         )
 
     # The PIT is the CDF integrated up to the last grid point at or below y_test,

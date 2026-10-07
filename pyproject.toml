@@ -115,7 +115,7 @@ ignore = [
 # Vendored from https://github.com/AWehenkel/UMNN; keep close to upstream.
 "src/calpit/nn/umnn/*" = ["B", "D", "N", "UP"]
 [tool.setuptools.package-data]
-calpit = ["py.typed"]
+calpit = ["py.typed", "nn/umnn/LICENSE"]
 
 [tool.coverage.run]
 omit=["src/calpit/_version.py"]

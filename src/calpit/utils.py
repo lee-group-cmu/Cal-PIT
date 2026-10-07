@@ -14,7 +14,7 @@ def normalize(
 
     Args:
         cde_estimates (numpy.ndarray): A numpy array or matrix of conditional density estimates.
-        x_grid (numpy.ndarray): The array of grid points.
+        y_grid (numpy.ndarray): The array of grid points.
         tol (float): The tolerance to accept for abs(area - 1).
         max_iter (int): The maximal number of search iterations.
 
@@ -78,14 +78,22 @@ def trapz_grid(y: np.ndarray, x: np.ndarray) -> np.ndarray:
     return np.hstack((np.zeros(len(integral))[:, None], integral))
 
 
-def trapz_grid_torch(y: torch.tensor, x: torch.tensor) -> torch.tensor:
+def trapz_grid_torch(y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     """
-    Same as trapz_grid but implemented in Pytorch
+    Does trapezoid integration between the same limits as the grid, in PyTorch.
+
+    Args:
+        y (torch.Tensor): The values to integrate, shape (n_rows, n_grid).
+        x (torch.Tensor): The grid points, shape (n_grid,).
+
+    Returns:
+        torch.Tensor: The integrals from x[0] to each grid point, shape (n_rows, n_grid).
     """
     dx = torch.diff(x)
     trapz_area = dx * (y[:, 1:] + y[:, :-1]) / 2
-    integral = torch.cumsum(trapz_area, axis=-1)
-    return torch.hstack((torch.zeros(len(integral), device=x.device)[:, None], integral))
+    integral = torch.cumsum(trapz_area, dim=-1)
+    zeros = torch.zeros(len(integral), dtype=integral.dtype, device=x.device)
+    return torch.hstack((zeros[:, None], integral))
 
 
 def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):

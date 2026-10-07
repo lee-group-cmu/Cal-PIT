@@ -3,6 +3,23 @@ import torch.nn as nn
 
 
 class ISplineLayer(nn.Module):
+    """
+    Output layer that is a monotone function of alpha built from I-spline basis functions.
+
+    The output is a convex combination of cubic I-spline basis functions of alpha on [0, 1],
+    with weights from a softmax over a linear map of the input. Each basis function increases
+    from 0 to 1, so the output is non-decreasing in alpha and lies in [0, 1].
+
+    Args:
+        in_features (int): The number of input features.
+        num_basis (int): The number of I-spline basis functions.
+        dropout_p (float, optional): The dropout probability applied to the weights.
+            Defaults to 0.
+
+    Raises:
+        ImportError: If spline-basis is not installed.
+    """
+
     def __init__(self, in_features, num_basis, dropout_p=0):
         super().__init__()
         self.in_features = in_features
@@ -33,6 +50,17 @@ class ISplineLayer(nn.Module):
     #         self.coefs.apply(init_weights)
 
     def interp1d(self, x, y, x_new):
+        """
+        Linearly interpolates tabulated basis functions.
+
+        Args:
+            x (torch.Tensor): The sorted grid, shape (n_grid,).
+            y (torch.Tensor): The basis functions on the grid, shape (n_grid, num_basis).
+            x_new (torch.Tensor): The points to interpolate at, shape (n_points,).
+
+        Returns:
+            torch.Tensor: The interpolated values, shape (n_points, num_basis).
+        """
         # 2. Find where in the original data, the values to interpolate
         #    would be inserted.
         #    Note: If x_new[n] == x[m], then m is returned by searchsorted.
@@ -65,6 +93,16 @@ class ISplineLayer(nn.Module):
         return y_new
 
     def forward(self, x, alpha):
+        """
+        Evaluates the layer.
+
+        Args:
+            x (torch.Tensor): The input features, shape (batch, in_features).
+            alpha (torch.Tensor): The coverage levels in [0, 1], shape (batch,).
+
+        Returns:
+            torch.Tensor: The output, shape (batch,).
+        """
         grid = self.grid.to(alpha)
         basis_vectors = self.basis_vectors.to(alpha)
         basis = self.interp1d(grid, basis_vectors, alpha)
@@ -78,8 +116,29 @@ class ISplineLayer(nn.Module):
 
 
 class IsplineNN(nn.Module):
-    def __init__(self, input_dim, hidden_layers=[512, 512, 512], dropout_p=0.5, num_basis=10):
+    """
+    Network for Cal-PIT whose output is monotone in the coverage level alpha.
+
+    An MLP of PReLU layers maps [alpha, features] to the weights of an ISplineLayer, so the
+    predicted conditional PIT CDF is non-decreasing in alpha and the recalibrated densities
+    from CalPit.transform are non-negative.
+
+    Args:
+        input_dim (int): The number of features, not counting alpha.
+        hidden_layers (list of int, optional): The widths of the hidden layers.
+            Defaults to [512, 512, 512].
+        dropout_p (float, optional): The dropout probability in the ISplineLayer.
+            Defaults to 0.5.
+        num_basis (int, optional): The number of I-spline basis functions. Defaults to 10.
+
+    Raises:
+        ImportError: If spline-basis is not installed.
+    """
+
+    def __init__(self, input_dim, hidden_layers=None, dropout_p=0.5, num_basis=10):
         super().__init__()
+        if hidden_layers is None:
+            hidden_layers = [512, 512, 512]
         self.all_layers = [input_dim + 1]
         self.hidden_layers = hidden_layers
         self.all_layers.extend(hidden_layers)
@@ -105,6 +164,16 @@ class IsplineNN(nn.Module):
         self.mlp_layers.apply(init_weights)
 
     def forward(self, x):
+        """
+        Evaluates the network.
+
+        Args:
+            x (torch.Tensor): The coverage level in column 0 followed by the features,
+                shape (batch, input_dim + 1).
+
+        Returns:
+            torch.Tensor: The predicted probability that the PIT is at most alpha, shape (batch,).
+        """
         alpha = x[:, 0]
 
         res = self.mlp_layers(x)
