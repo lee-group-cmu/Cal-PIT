@@ -114,6 +114,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Vendored from https://github.com/AWehenkel/UMNN; keep close to upstream.
 "src/calpit/nn/umnn/*" = ["B", "D", "N", "UP"]
+# Test names say what they test.
+"tests/*" = ["D103"]
 [tool.setuptools.package-data]
 calpit = ["py.typed", "nn/umnn/LICENSE"]
 

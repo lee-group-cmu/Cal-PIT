@@ -40,9 +40,9 @@ class CalPit:
         self.device = next(model.parameters()).device
         count_parameters(self.model)
 
-        self.training_loss = None
-        self.validation_bce = None
-        self.val_loss_min = None
+        self.training_loss: np.ndarray | None = None
+        self.validation_bce: np.ndarray | None = None
+        self.val_loss_min: float | None = None
 
     def fit(
         self,
