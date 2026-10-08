@@ -1,34 +1,48 @@
 from pathlib import Path
+
 import numpy as np
 import torch
-from torch.utils.data import TensorDataset, DataLoader
 from scipy.interpolate import PchipInterpolator
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import trange
 
-
-from calpit.nn.models import MLP
-from calpit.nn.utils import count_parameters, RandomDataset, EarlyStopping
 from calpit.metrics import probability_integral_transform
+from calpit.nn.utils import EarlyStopping, RandomDataset, count_parameters
 from calpit.utils import trapz_grid
 
 
 class CalPit:
-    def __init__(self, model: torch.nn.Module) -> None:
-        """
-        Initializes an instance of the CalPit Class.
+    """
+    Diagnoses and recalibrates conditional density estimates (CDEs) with Cal-PIT.
 
-        Args:
-            model (str or torch.nn.Module): The model to be used to learn the conditional PIT.
-            Can be any pytorch model that outputs a value between 0 and 1.
-        """
-        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    The model learns the conditional CDF of the probability integral transform (PIT),
+    P(PIT <= alpha | x), by regressing the indicator PIT <= alpha on [alpha, x]. Its predictions
+    give local P-P plots that diagnose the CDEs at any x (predict), and recalibrate them by
+    mapping each CDF through the learned PIT CDF (transform).
+
+    Args:
+        model (torch.nn.Module): The model that learns the conditional PIT CDF. It takes a batch
+            of shape (batch, n_features + 1), the coverage level alpha in column 0 followed by
+            the features, and returns values in [0, 1]. transform needs a model that is monotone
+            in alpha, such as calpit.nn.IsplineNN or calpit.nn.MonotonicNN.
+
+    Attributes:
+        model (torch.nn.Module): The model.
+        device (torch.device): The device of the model's parameters, where batches are sent.
+        training_loss (np.ndarray): The training loss per epoch, set by fit.
+        validation_bce (np.ndarray): The validation binary cross entropy per epoch, set by fit.
+        val_loss_min (float): The lowest validation loss, whose model fit restores.
+    """
+
+    def __init__(self, model: torch.nn.Module) -> None:
+        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model
         self.device = next(model.parameters()).device
         count_parameters(self.model)
 
-        self.training_loss = None
-        self.validation_bce = None
-        self.val_loss_min = None
+        self.training_loss: np.ndarray | None = None
+        self.validation_bce: np.ndarray | None = None
+        self.val_loss_min: float | None = None
 
     def fit(
         self,
@@ -59,24 +73,29 @@ class CalPit:
             y_calib (numpy.ndarray, optional): The target values for calibration data.
             cde_calib (numpy.ndarray, optional): The conditional density estimates for calibration.
             y_grid (numpy.ndarray, optional): The grid of target values for calibration.
-            pit_calib (numpy.ndarray, optional): The probability integral transforms for the given CDEs evaluated at y_calib.
-            Either pit_calib or y_calib, cde_calib and y_grid must be provided.
+            pit_calib (numpy.ndarray, optional): The probability integral transforms for the given
+                CDEs evaluated at y_calib. Either pit_calib or y_calib, cde_calib and y_grid must
+                be provided.
             oversample (int, optional): The oversampling factor for the training data. Default is 1.
-            This is used to upsample the number of coverage values used for training.
-            n_cov_val (int, optional): The number of coverage values to use for validation. Default is 201.
-            patience (int, optional): The number of epochs to wait for improvement in validation loss before early stopping. Default is 20.
+                This is used to upsample the number of coverage values used for training.
+            n_cov_val (int, optional): The number of coverage values to use for validation.
+                Default is 201.
+            patience (int, optional): The number of epochs to wait for improvement in validation
+                loss before early stopping. Default is 20.
             n_epochs (int, optional): The maximum number of epochs for training. Default is 1000.
             lr (float, optional): The initial learning rate for the optimizer (AdamW). Default is 0.001.
             weight_decay (float, optional): The weight decay for the optimizer. Default is 1e-5.
             batch_size (int, optional): The batch size for training and validation. Default is 2048.
-            frac_train (float, optional): The fraction of data to use for training.
-            The rest is used for the validation set used to determine when to stop training. Default is 0.9.
+            frac_train (float, optional): The fraction of data to use for training. The rest is used
+                for the validation set used to determine when to stop training. Default is 0.9.
             lr_decay (float, optional): The learning rate decay factor for the rule,
-            learning_rate(epoch) = lr*lr_decay ** epoch. Default is 0.99.
-            trace_func (function, optional): The function used for printing training progress. Default is print.
+                learning_rate(epoch) = lr*lr_decay ** epoch. Default is 0.99.
+            trace_func (function, optional): The function used for printing training progress.
+                Default is print.
             seed (int, optional): The random seed for reproducibility. Default is 299792458.
             num_workers (int, optional): The number of CPU worker threads for data loading. Default is 1.
-            checkpt_path (str, optional): The path to save the checkpoint of the best model. Default is "_results/checkpoint_.pt".
+            checkpt_path (str, optional): The path to save the checkpoint of the best model.
+                Default is "_results/checkpoint_.pt".
 
         Returns:
             torch.nn.Module: The trained model.
@@ -126,8 +145,7 @@ class CalPit:
         # Optimizer
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
         # Use lr decay
-        schedule_rule = lambda epoch: lr_decay**epoch
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=schedule_rule)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: lr_decay**epoch)
         checkpt_path = Path(checkpt_path)
         checkpt_path.parent.mkdir(parents=True, exist_ok=True)
         early_stopping = EarlyStopping(
@@ -142,7 +160,7 @@ class CalPit:
 
             # Training loop per epoch
             self.model.train()  # prep model for training
-            for batch, (feature, target) in enumerate(train_dataloader, start=1):
+            for feature, target in train_dataloader:
                 feature = feature.to(self.device)
                 target = target.to(self.device)
 
@@ -167,7 +185,6 @@ class CalPit:
             self.model.eval()  # prep model for evaluation
 
             for feature, target in valid_dataloader:
-
                 feature = feature.to(self.device)
                 target = target.to(self.device)
 

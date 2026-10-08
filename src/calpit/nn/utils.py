@@ -1,7 +1,7 @@
-import torch
 import numpy as np
-from torch.utils.data import Dataset
+import torch
 from prettytable import PrettyTable
+from torch.utils.data import Dataset
 
 
 class RandomDataset(Dataset):
@@ -84,7 +84,13 @@ class EarlyStopping:
         self.trace_func = trace_func
 
     def __call__(self, val_loss, model):
+        """
+        Records an epoch's validation loss and checkpoints the model if it improved.
 
+        Args:
+            val_loss (float): The validation loss of the epoch.
+            model (torch.nn.Module): The model to checkpoint.
+        """
         score = -val_loss
 
         if self.best_score is None:
@@ -127,36 +133,39 @@ def cde_loss(cde_estimates: torch.Tensor, y_grid: torch.Tensor, y_test: torch.Te
         ValueError: If the dimensions of the input tensors are not compatible.
 
     """
-    if len(z_test.shape) == 1:
-        z_test = z_test.reshape(-1, 1)
-    if len(z_grid.shape) == 1:
-        z_grid = z_grid.reshape(-1, 1)
+    if len(y_test.shape) == 1:
+        y_test = y_test.reshape(-1, 1)
+    if len(y_grid.shape) == 1:
+        y_grid = y_grid.reshape(-1, 1)
 
     n_obs, n_grid = cde_estimates.shape
-    n_samples, feats_samples = z_test.shape
-    n_grid_points, feats_grid = z_grid.shape
+    n_samples, feats_samples = y_test.shape
+    n_grid_points, feats_grid = y_grid.shape
 
     if n_obs != n_samples:
         raise ValueError(
-            f"Number of samples in CDEs should be the same as in z_test.Currently {n_obs} and {n_samples}."
+            f"Number of samples in CDEs should be the same as in y_test. Currently {n_obs} and {n_samples}."
         )
     if n_grid != n_grid_points:
         raise ValueError(
-            f"Number of grid points in CDEs should be the same as in z_grid. Currently {n_grid} and {n_grid_points}."
+            "Number of grid points in CDEs should be the same as in y_grid. "
+            f"Currently {n_grid} and {n_grid_points}."
         )
 
     if feats_samples != feats_grid:
         raise ValueError(
-            f"Dimensionality of test points and grid points need to coincise. Currently {feats_samples} and {feats_grid}."
+            "Dimensionality of test points and grid points need to coincide. "
+            f"Currently {feats_samples} and {feats_grid}."
         )
 
-    integrals = torch.trapz(cde_estimates**2, torch.squeeze(y_grid), axis=1)
+    integrals = torch.trapezoid(cde_estimates**2, torch.squeeze(y_grid), dim=1)
 
-    nn_ids = torch.argmin(torch.abs(y_grid - y_test.T), axis=0)
-    likeli = cde_estimates[(tuple(torch.arange(n_samples)), tuple(nn_ids))]
+    nn_ids = torch.argmin(torch.abs(y_grid - y_test.T), dim=0)
+    likeli = cde_estimates[torch.arange(n_samples), nn_ids]
 
     losses = integrals - 2 * likeli
     loss = torch.mean(losses)
-    se_error = torch.std(losses, axis=0) / (n_obs**0.5)
+    # correction=0 matches np.std in calpit.metrics.cde_loss.
+    se_error = torch.std(losses, dim=0, correction=0) / (n_obs**0.5)
 
     return loss, se_error

@@ -16,12 +16,11 @@ classifiers = [
 dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
-"numpy",
-"scipy",
-"prettytable",
-"torch",
-"torchvision",
-"tqdm",
+    "numpy",
+    "prettytable",
+    "scipy>=1.6", # scipy.integrate.trapezoid
+    "torch",
+    "tqdm",
 ]
 
 [project.urls]
@@ -29,15 +28,26 @@ dependencies = [
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
+spline = [
+    "spline-basis", # Used by calpit.nn.IsplineNN
+]
+hdf5 = [
+    "h5py", # Used by calpit.datasets.PhotometryDataset
+]
+plot = [
+    "matplotlib", # Used by calpit.utils.plot_pit
+]
+all = [
+    "calpit[spline,hdf5,plot]",
+]
 dev = [
-    "asv==0.6.3", # Used to compute performance benchmarks
-    "black", # Used for static linting of files
+    "calpit[all]",
     "jupyter", # Clears output from Jupyter notebooks
     "mypy", # Used for static type checking of files
     "pre-commit", # Used to run checks before finalizing a git commit
-    "pylint", # Used for static linting of files
     "pytest",
     "pytest-cov", # Used to report total code coverage
+    "ruff", # Used for linting and formatting
 ]
 
 [build-system]
@@ -54,14 +64,6 @@ write_to = "src/calpit/_version.py"
 testpaths = [
     "tests",
 ]
-
-[tool.black]
-line-length = 110
-target-version = ["py310"]
-
-[tool.isort]
-profile = "black"
-line_length = 110
 
 [tool.ruff]
 line-length = 110
@@ -108,8 +110,14 @@ ignore = [
     "UP015", # Allow redundant open parameters
     "UP028", # Allow yield in for loop
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Vendored from https://github.com/AWehenkel/UMNN; keep close to upstream.
+"src/calpit/nn/umnn/*" = ["B", "D", "N", "UP"]
+# Test names say what they test.
+"tests/*" = ["D103"]
 [tool.setuptools.package-data]
-calpit = ["py.typed"]
+calpit = ["py.typed", "nn/umnn/LICENSE"]
 
 [tool.coverage.run]
 omit=["src/calpit/_version.py"]

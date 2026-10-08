@@ -1,6 +1,7 @@
-import torch
-import numpy as np
 import math
+
+import numpy as np
+import torch
 
 
 def _flatten(sequence):
@@ -29,7 +30,6 @@ def integrate(x0, nb_steps, step_sizes, integrand, h, compute_grad=False, x_tot=
     # Clenshaw-Curtis Quadrature Method
     cc_weights, steps = compute_cc_weights(nb_steps)
 
-    
     cc_weights, steps = cc_weights.to(x0), steps.to(x0)
 
     if compute_grad:
