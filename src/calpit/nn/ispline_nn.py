@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -37,10 +38,12 @@ class ISplineLayer(nn.Module):
                 "Install it with: pip install 'calpit[spline]'"
             ) from error
         self.grid = torch.linspace(0, 1, 1000)
-        self.basis_vectors = splinebasis.ISplineBasis(
-            order=3, num_basis=num_basis, lower=0, upper=1, grid=self.grid
+        # spline-basis 0.1 returns a NumPy array; 0.2 follows the grid's backend and may
+        # return a view with negative strides, so pass a NumPy grid and copy the result.
+        basis_vectors = splinebasis.ISplineBasis(
+            order=3, num_basis=num_basis, lower=0, upper=1, grid=self.grid.numpy().astype(np.float64)
         ).basis_vectors
-        self.basis_vectors = torch.from_numpy(self.basis_vectors)
+        self.basis_vectors = torch.from_numpy(np.ascontiguousarray(basis_vectors, dtype=np.float64))
 
     #         def init_weights(m):
     #             if isinstance(m, nn.Linear):
