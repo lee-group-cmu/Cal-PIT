@@ -64,6 +64,8 @@ repos:
         language: system
         types: [python]
         files: ^(src|tests)/
+        # One process: parallel batches share .mypy_cache and crash mypy.
+        require_serial: true
         args:
           [
             "--ignore-missing-imports", # Ignore imports without type hints

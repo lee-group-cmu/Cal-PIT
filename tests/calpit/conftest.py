@@ -7,7 +7,7 @@ import numpy.typing as npt
 import pytest
 from scipy import stats
 
-FloatArray = npt.NDArray[np.float64]
+FloatArray = npt.NDArray[np.floating]
 
 
 @dataclasses.dataclass(frozen=True)
