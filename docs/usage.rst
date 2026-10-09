@@ -53,9 +53,11 @@ interpolation error differs.
 - **Grid.** The recalibrated CDF on the grid is interpolated with a PCHIP spline
   and differentiated, so the new densities can be slightly negative or fail to
   integrate to one; ``calpit.utils.normalize`` fixes both. The PIT integrates
-  the density up to the last grid point at or below the true value, as `calpit`
-  always has, so it is biased low by up to the density times the grid spacing:
-  use a grid fine enough for that not to matter.
+  the density, taken as linear between grid points as in the trapezoid rule,
+  exactly up to the true value, so its error falls with the square of the grid
+  spacing. Before version 0.2 `calpit` stopped at the last grid point at or
+  below the true value, which biases the PIT low by up to the density times the
+  grid spacing; ``GridCDE(pdf, y_grid, pit_method="step")`` reproduces that.
 - **Quantiles.** The CDF is interpolated linearly between the quantiles, and the
   recalibrated quantiles are at the same levels. Outside the outermost quantiles
   the CDF is taken as the outermost level, so include the levels 0 and 1, at the

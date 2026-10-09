@@ -84,15 +84,22 @@ class GridCDE:
     Args:
         pdf: The densities, shape (n_objects, n_grid).
         y_grid: The increasing grid, shape (n_grid,).
+        pit_method: How pit integrates up to the true value, "linear" or
+            "step" (see calpit.metrics.probability_integral_transform).
+            "step" reproduces calpit before version 0.2.
 
     Attributes:
         pdf: The densities, shape (n_objects, n_grid).
         y_grid: The grid, shape (n_grid,).
+        pit_method: How pit integrates up to the true value.
     """
 
-    def __init__(self, pdf: npt.ArrayLike, y_grid: npt.ArrayLike) -> None:
+    def __init__(self, pdf: npt.ArrayLike, y_grid: npt.ArrayLike, pit_method: str = "linear") -> None:
         self.pdf = np.asarray(pdf, dtype=float)
         self.y_grid = np.ravel(np.asarray(y_grid, dtype=float))
+        self.pit_method = pit_method
+        if pit_method not in metrics.PIT_METHODS:
+            raise ValueError(f"pit_method must be one of {metrics.PIT_METHODS}: {pit_method=}")
         if self.pdf.ndim != 2 or self.pdf.shape[1] != len(self.y_grid):
             raise ValueError(
                 f"pdf must have shape (n_objects, len(y_grid)): {self.pdf.shape=}, {self.y_grid.shape=}"
@@ -109,9 +116,8 @@ class GridCDE:
     def pit(self, y_true: npt.ArrayLike) -> FloatArray:
         """Returns the PIT of the true values.
 
-        The CDF is integrated with the trapezoid rule up to the last grid point
-        at or below each true value, as calpit.metrics.probability_integral_transform
-        does.
+        The density is integrated up to each true value as
+        calpit.metrics.probability_integral_transform does with pit_method.
 
         Args:
             y_true: The true values, shape (n_objects,).
@@ -119,7 +125,9 @@ class GridCDE:
         Returns:
             The PIT values, shape (n_objects,).
         """
-        return metrics.probability_integral_transform(self.pdf, self.y_grid, np.asarray(y_true))
+        return metrics.probability_integral_transform(
+            self.pdf, self.y_grid, np.asarray(y_true), method=self.pit_method
+        )
 
     def recalibration_alpha(self) -> FloatArray:
         """Returns the CDFs on the grid, where r is needed, shape (n_objects, n_grid)."""
@@ -139,7 +147,7 @@ class GridCDE:
             integrate to one; calpit.utils.normalize fixes both.
         """
         cdf = interpolate.PchipInterpolator(self.y_grid, pit_cdf, extrapolate=True, axis=1)
-        return GridCDE(cdf.derivative(1)(self.y_grid), self.y_grid)
+        return GridCDE(cdf.derivative(1)(self.y_grid), self.y_grid, self.pit_method)
 
 
 class QuantileCDE:
