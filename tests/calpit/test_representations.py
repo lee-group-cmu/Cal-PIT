@@ -92,13 +92,12 @@ def test_identity_recalibration_keeps_quantiles(means) -> None:
     np.testing.assert_allclose(cde.recalibrate(np.tile(LEVELS, (N_OBJECTS, 1))).locations, cde.locations)
 
 
-def test_interp_rows_matches_numpy_in_blocks(monkeypatch) -> None:
+def test_interp_rows_matches_numpy() -> None:
     rng = np.random.default_rng(4)
     xp = np.sort(rng.uniform(0, 1, (30, 12)), axis=1)
     xp[:, 3] = xp[:, 4]  # A tie.
     fp = np.sort(rng.normal(size=(30, 12)), axis=1)
     x_new = rng.uniform(-0.1, 1.1, (30, 7))
-    monkeypatch.setattr(representations, "_MAX_COMPARISONS", 100)
     result = representations._interp_rows(x_new, xp, fp)
     for row in range(30):
         np.testing.assert_allclose(result[row], np.interp(x_new[row], xp[row], fp[row]))

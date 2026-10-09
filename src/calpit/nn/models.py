@@ -12,7 +12,10 @@ row:
 The network says which it returns in its `output` attribute, "logit" (the
 default when the attribute is absent) or "probability". A logit is trained
 with BCEWithLogitsLoss and can be any real number; a probability must lie in
-[0, 1]. CalPIT.transform needs r to be non-decreasing in alpha. Networks that
+[0, 1]. A network can also define forward_curves(alpha, x), with alpha of
+shape (batch, n_alpha) and output of shape (batch, n_alpha), to predict many
+alpha per object at once; calpit.nn.predict_pit_cdf then uses it.
+CalPIT.transform needs r to be non-decreasing in alpha. Networks that
 are monotone by construction, like IsplineNN and MonotonicNN, give that
 exactly; for any other network CalPIT rearranges the predictions
 (calpit.coverage.rearrange).

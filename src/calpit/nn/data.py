@@ -22,6 +22,10 @@ class CoverageDataset(data.Dataset):
     Each time an item is read, alpha is drawn from Uniform(0, 1) with the torch
     random number generator, so every epoch sees new (alpha, x) pairs.
 
+    Indexing with a list of indices returns a whole batch at once, which is
+    much faster than collating single items; batches() makes a DataLoader that
+    does this. The batch draws the same alpha as reading its items one by one.
+
     Args:
         x: The features, shape (n_objects, n_features).
         pit: The PIT values, shape (n_objects,).
@@ -43,12 +47,41 @@ class CoverageDataset(data.Dataset):
         """Returns the number of items per epoch."""
         return int(len(self.x) * self.oversample)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Returns the item (alpha, x, target) of object index % n_objects."""
-        index %= len(self.x)
-        alpha = torch.rand(1)
-        target = (self.pit[index] <= alpha).float()
-        return alpha[0], self.x[index], target[0]
+    def __getitem__(self, index: int | list[int]) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Returns the item (alpha, x, target) of object index % n_objects, or a batch for a list."""
+        if isinstance(index, int):
+            index %= len(self.x)
+            alpha = torch.rand(1)
+            target = (self.pit[index] <= alpha).float()
+            return alpha[0], self.x[index], target[0]
+        indices = np.asarray(index) % len(self.x)
+        alpha = torch.rand(len(indices))
+        # Compared in float32, as the single-item comparison above does.
+        target = (torch.as_tensor(self.pit[indices], dtype=torch.float32) <= alpha).float()
+        return alpha, self.x[indices], target
+
+    def batches(self, batch_size: int, shuffle: bool = True, num_workers: int = 0) -> data.DataLoader:
+        """Returns a DataLoader that reads whole batches of shuffled items.
+
+        It yields the same batches, with the same alpha, as
+        DataLoader(self, batch_size=batch_size, shuffle=shuffle), but builds
+        each batch at once.
+
+        Args:
+            batch_size: The number of items per batch.
+            shuffle: Whether to shuffle the items every epoch.
+            num_workers: The number of worker processes.
+
+        Returns:
+            The DataLoader.
+        """
+        sampler: data.Sampler[int] = data.RandomSampler(self) if shuffle else data.SequentialSampler(self)
+        return data.DataLoader(
+            self,
+            sampler=data.BatchSampler(sampler, batch_size, drop_last=False),
+            batch_size=None,
+            num_workers=num_workers,
+        )
 
 
 class CoverageGridDataset(data.Dataset):

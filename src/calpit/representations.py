@@ -24,8 +24,6 @@ from calpit import metrics, utils
 
 FloatArray = npt.NDArray[np.floating]
 
-_MAX_COMPARISONS = 2**24
-
 
 class ConditionalDensities(Protocol):
     """A set of CDEs, one per object, that Cal-PIT can fit and recalibrate."""
@@ -64,17 +62,10 @@ def _interp_rows(x_new: FloatArray, xp: FloatArray, fp: FloatArray) -> FloatArra
     """
     fp = np.broadcast_to(fp, xp.shape)
     n_points = xp.shape[1]
-    # Count the xp below each new point a block of rows at a time, which bounds
-    # the (rows, n_new, n_points) comparison to about _MAX_COMPARISONS values.
-    rows_per_block = max(1, _MAX_COMPARISONS // (x_new.shape[1] * n_points))
-    hi = np.concatenate(
-        [
-            (
-                xp[start : start + rows_per_block, None, :] < x_new[start : start + rows_per_block, :, None]
-            ).sum(axis=-1)
-            for start in range(0, len(xp), rows_per_block)
-        ]
-    )
+    # The number of xp strictly below each new point, by binary search per row.
+    hi = np.empty(x_new.shape, dtype=np.intp)
+    for row, (xp_row, x_row) in enumerate(zip(xp, x_new, strict=True)):
+        hi[row] = np.searchsorted(xp_row, x_row, side="left")
     hi = np.clip(hi, 1, n_points - 1)
     lo = hi - 1
     xp_lo = np.take_along_axis(xp, lo, axis=1)

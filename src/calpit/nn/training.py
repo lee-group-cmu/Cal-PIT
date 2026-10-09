@@ -19,7 +19,8 @@ def coverage_loss(
             shape (batch,).
         output_type: What the network returns, "logit" or "probability"
             (calpit.nn.output_type gives it). Probabilities are clamped to
-            [0, 1] first.
+            [0, 1] first, and their loss is computed in float32 outside any
+            autocast region, where torch refuses binary_cross_entropy.
         reduction: "mean", "sum" or "none", as in torch.nn.BCELoss.
 
     Returns:
@@ -30,9 +31,10 @@ def coverage_loss(
     if output_type == "logit":
         return functional.binary_cross_entropy_with_logits(output, target, reduction=reduction)
     if output_type == "probability":
-        return functional.binary_cross_entropy(
-            torch.clamp(output, min=0.0, max=1.0), target, reduction=reduction
-        )
+        with torch.autocast(device_type=output.device.type, enabled=False):
+            return functional.binary_cross_entropy(
+                torch.clamp(output.float(), min=0.0, max=1.0), target.float(), reduction=reduction
+            )
     raise ValueError(f"output_type must be one of {models.OUTPUT_TYPES}: {output_type=}")
 
 
@@ -51,8 +53,10 @@ def predict_pit_cdf(
     """Predicts r(alpha; x) = P(PIT <= alpha | x) with a Cal-PIT network.
 
     The network is evaluated in eval mode without gradients, and restored to
-    the mode it was in. Logits go through a sigmoid; the results are clipped
-    to [0, 1]. They are not rearranged (see calpit.coverage.rearrange).
+    the mode it was in. A network with a forward_curves(alpha, x) method
+    (see calpit.nn.models) is called once per object with all its alpha.
+    Logits go through a sigmoid; the results are clipped to [0, 1]. They are
+    not rearranged (see calpit.coverage.rearrange).
 
     Args:
         model: The network, which follows the contract in calpit.nn.models.
@@ -72,6 +76,7 @@ def predict_pit_cdf(
     device = _device_of(model) if device is None else torch.device(device)
     model.to(device)
     output_type = models.output_type(model)
+    forward_curves = getattr(model, "forward_curves", None)
     was_training = model.training
     model.eval()
     batches = []
@@ -79,6 +84,20 @@ def predict_pit_cdf(
         with torch.no_grad():
             for start in range(0, len(x), batch_size):
                 x_batch = x[start : start + batch_size]
+                if forward_curves is not None:
+                    alpha_batch = (
+                        np.broadcast_to(alpha, (len(x_batch), alpha.shape[-1]))
+                        if alpha.ndim == 1
+                        else alpha[start : start + batch_size]
+                    )
+                    output = forward_curves(
+                        torch.as_tensor(alpha_batch, dtype=torch.float32, device=device),
+                        torch.as_tensor(x_batch, dtype=torch.float32, device=device),
+                    )
+                    if output_type == "logit":
+                        output = torch.sigmoid(output)
+                    batches.append(output.cpu().numpy().astype(np.float64))
+                    continue
                 if alpha.ndim == 1:
                     # Rows run alpha-major: every object at alpha[0], then at alpha[1], ...
                     alpha_rows = np.repeat(alpha, len(x_batch))

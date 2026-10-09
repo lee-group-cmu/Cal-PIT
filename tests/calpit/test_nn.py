@@ -79,8 +79,6 @@ def test_trapz_grid_torch_matches_numpy(gaussian_cdes) -> None:
 
 def test_hand_written_training_loop() -> None:
     """The example of docs/training_loop.rst."""
-    from torch.utils import data  # noqa: PLC0415 - kept next to the example it mirrors.
-
     x_all, y_all = calpit.datasets.TuningFork(dims=N_FEATURES).generate_data(4000)
     y_grid = np.linspace(-15.0, 15.0, 301)
     cde_all = np.tile(stats.norm.pdf(y_grid, 0.0, 3.0), (len(y_all), 1))
@@ -92,7 +90,7 @@ def test_hand_written_training_loop() -> None:
     x_train, pit_train, x_val, pit_val = calpit.coverage.train_val_split(
         x_calib, pit, val_fraction=0.1, random_state=0
     )
-    train_loader = data.DataLoader(nn.CoverageDataset(x_train, pit_train), batch_size=256, shuffle=True)
+    train_loader = nn.CoverageDataset(x_train, pit_train).batches(batch_size=256)
     val_set = nn.CoverageGridDataset(x_val, pit_val, alpha=np.linspace(0.001, 0.999, 101))
 
     model = nn.MonotonicNN(N_FEATURES, [32, 32])
@@ -164,3 +162,86 @@ def test_photometry_dataset(tmp_path) -> None:
     _, x, _ = dataset[2]
     np.testing.assert_array_equal(x.numpy(), features[2])
     dataset.close()
+
+
+def test_probability_loss_works_under_autocast() -> None:
+    probability, target = torch.rand(16), (torch.rand(16) < 0.5).float()
+    expected = nn.coverage_loss(probability, target, "probability")
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        loss = nn.coverage_loss(probability.bfloat16(), target, "probability")
+    assert loss.dtype == torch.float32
+    torch.testing.assert_close(loss, expected, rtol=1e-2, atol=0)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_default_model_trains_with_mixed_precision() -> None:
+    pytest.importorskip("splinebasis")
+    x, y = calpit.datasets.TuningFork(dims=N_FEATURES).generate_data(500)
+    y_grid = np.linspace(-15.0, 15.0, 101)
+    cde = calpit.GridCDE(np.tile(stats.norm.pdf(y_grid, 0.0, 3.0), (len(y), 1)), y_grid)
+    estimator = calpit.CalPIT(
+        max_epochs=1, trainer_kwargs={"accelerator": "gpu", "precision": "16-mixed"}
+    ).fit(x, y, cde)
+    assert np.isfinite(estimator.train_loss_).all()
+
+
+def test_ispline_forward_curves_matches_forward() -> None:
+    pytest.importorskip("splinebasis")
+    torch.manual_seed(0)
+    model = nn.IsplineNN(N_FEATURES, [16])
+    x = np.random.default_rng(0).normal(size=(9, N_FEATURES))
+    alpha = np.random.default_rng(1).uniform(size=(9, 7))
+    curves = nn.predict_pit_cdf(model, x, alpha, batch_size=4)
+    model.eval()
+    with torch.no_grad():
+        rows = model(
+            torch.as_tensor(alpha.ravel(), dtype=torch.float32),
+            torch.as_tensor(np.repeat(x, 7, axis=0), dtype=torch.float32),
+        )
+    # Equal up to float32 rounding: the I-spline sums run over differently shaped tensors.
+    np.testing.assert_allclose(curves, rows.numpy().astype(np.float64).reshape(9, 7), rtol=1e-6)
+
+
+def test_batched_loader_matches_the_item_loader() -> None:
+    from torch.utils import data  # noqa: PLC0415 - kept next to the comparison it makes.
+
+    rng = np.random.default_rng(0)
+    dataset = nn.CoverageDataset(rng.normal(size=(300, N_FEATURES)), rng.uniform(size=300), oversample=2)
+    torch.manual_seed(5)
+    items = list(data.DataLoader(dataset, batch_size=64, shuffle=True))
+    torch.manual_seed(5)
+    batches = list(dataset.batches(64))
+    assert len(items) == len(batches)
+    for item_batch, batch in zip(items, batches, strict=True):
+        for expected, actual in zip(item_batch, batch, strict=True):
+            torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+
+
+def test_distributed_training_stops_together(tmp_path) -> None:
+    """Two CPU processes must agree on the validation loss and the epoch to stop at."""
+    pytest.importorskip("lightning")
+    import subprocess  # noqa: PLC0415 - only this test launches processes.
+    import sys  # noqa: PLC0415 - only this test launches processes.
+
+    script = tmp_path / "ddp.py"
+    script.write_text(
+        "import os\n"
+        "import numpy as np\n"
+        "from scipy import stats\n"
+        "import calpit, calpit.nn\n"
+        "if __name__ == '__main__':\n"
+        "    x, y = calpit.datasets.TuningFork(dims=3).generate_data(1000)\n"
+        "    g = np.linspace(-15, 15, 101)\n"
+        "    cde = calpit.GridCDE(np.tile(stats.norm.pdf(g, 0, 3), (len(y), 1)), g)\n"
+        "    est = calpit.CalPIT(calpit.nn.MLP(3, [8]), max_epochs=200, patience=2, batch_size=128,\n"
+        "        lr=0.05, lr_decay=0.9, n_alpha_val=21,\n"
+        "        trainer_kwargs={'accelerator': 'cpu', 'devices': 2, 'strategy': 'ddp'}).fit(x, y, cde)\n"
+        "    print('RESULT', len(est.val_bce_), repr(est.val_bce_[-1]), flush=True)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, timeout=300, check=True, cwd=tmp_path
+    )
+    lines = [line for line in result.stdout.splitlines() if line.startswith("RESULT")]
+    assert len(lines) == 2
+    assert lines[0] == lines[1]
+    assert int(lines[0].split()[1]) < 200

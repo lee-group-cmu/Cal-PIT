@@ -99,7 +99,10 @@ features. Any other network follows one contract:
            ...
 
 A ``"logit"`` network is trained with ``BCEWithLogitsLoss`` and can output any real
-number; a ``"probability"`` network must output values in :math:`[0, 1]`.
+number; a ``"probability"`` network must output values in :math:`[0, 1]`. A network
+can also define ``forward_curves(alpha, x)``, with ``alpha`` of shape
+``(batch, n_alpha)``, to predict all the :math:`\alpha` of an object in one pass;
+``IsplineNN`` does, so its MLP runs once per object.
 ``calpit.nn.ConcatAlpha(network)`` adapts a network that takes one tensor, giving
 it :math:`[\alpha, x]` with :math:`\alpha` in column 0. ``CalPIT`` copies the
 network it is given and trains the copy, ``model_``. To size a network from the
@@ -142,6 +145,8 @@ Training uses a PyTorch Lightning ``Trainer``. Pass any of its arguments through
 
 By default the trainer picks the accelerator itself, uses one device, logs
 nothing and writes no checkpoint files; the best weights are kept in memory.
+On several devices the validation loss is summed over all of them, so every
+process stops at the same epoch.
 After ``fit``, ``train_loss_`` and ``val_bce_`` hold the loss curves.
 
 scikit-learn classifiers
