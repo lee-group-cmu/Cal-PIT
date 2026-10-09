@@ -154,3 +154,4 @@ experiments/
 
 #pytorch checkpoints
 *.pt
+docs/.cite-check/
