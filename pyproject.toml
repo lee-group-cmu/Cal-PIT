@@ -1,13 +1,14 @@
 [project]
 name = "calpit"
-license = {file = "LICENSE"}
+# calpit is MIT; the UMNN code vendored in calpit.nn.umnn is BSD-3-Clause.
+license = "MIT AND BSD-3-Clause"
+license-files = ["LICENSE", "src/calpit/nn/umnn/LICENSE"]
 readme = "README.md"
 authors = [
     { name = "Biprateep Dey", email = "biprateep@pitt.edu" }
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "License :: OSI Approved :: MIT License",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
@@ -60,7 +61,7 @@ dev = [
 
 [build-system]
 requires = [
-    "setuptools>=62", # Used to build and package the Python project
+    "setuptools>=77", # Builds the package; 77 reads SPDX license expressions
     "setuptools_scm>=6.2", # Gets release version from git. Makes it available programmatically
 ]
 build-backend = "setuptools.build_meta"
