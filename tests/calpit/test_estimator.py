@@ -195,3 +195,39 @@ def test_diagnose(data) -> None:
     perfect = calpit.diagnostics.LocalCalibration(alpha=local.alpha, pit_cdf=np.tile(local.alpha, (3, 1)))
     np.testing.assert_allclose(perfect.ks, 0)
     np.testing.assert_allclose(perfect.coverage(0.9), 0.9)
+
+
+def test_nested_model_params() -> None:
+    ensemble = pytest.importorskip("sklearn.ensemble")
+    base = pytest.importorskip("sklearn.base")
+    estimator = calpit.CalPIT(ensemble.HistGradientBoostingClassifier())
+    assert estimator.get_params()["model__max_iter"] == 100
+    assert "model__max_iter" not in estimator.get_params(deep=False)
+    estimator.set_params(model__max_iter=7, n_alpha=5)
+    assert estimator.model.max_iter == 7
+    assert estimator.n_alpha == 5
+    assert base.clone(estimator).get_params()["model__max_iter"] == 7
+    with pytest.raises(ValueError, match="no set_params"):
+        calpit.CalPIT().set_params(model__hidden=3)
+
+
+def test_options_of_the_other_backend_warn(data) -> None:
+    ensemble = pytest.importorskip("sklearn.ensemble")
+    estimator = calpit.CalPIT(ensemble.HistGradientBoostingClassifier(max_iter=5), max_epochs=3, n_alpha=5)
+    with pytest.warns(UserWarning, match="ignores max_epochs with a scikit-learn model"):
+        estimator.fit(data.x_calib, data.y_calib, data.cde(3000))
+
+
+def test_pickled_network_is_on_the_cpu(data) -> None:
+    torch = pytest.importorskip("torch")
+    nn = pytest.importorskip("calpit.nn")
+    if not torch.cuda.is_available():
+        pytest.skip("needs CUDA")
+    estimator = calpit.CalPIT(nn.MLP(N_FEATURES, [8]), max_epochs=1).fit(
+        data.x_calib, data.y_calib, data.cde(3000)
+    )
+    expected = estimator.predict(data.x_test)
+    assert next(estimator.model_.parameters()).is_cuda
+    restored = pickle.loads(pickle.dumps(estimator))
+    assert not next(restored.model_.parameters()).is_cuda
+    np.testing.assert_array_equal(restored.predict(data.x_test), expected)

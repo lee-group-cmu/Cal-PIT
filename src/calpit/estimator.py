@@ -3,6 +3,7 @@
 import copy
 import inspect
 import sys
+import warnings
 from collections.abc import Mapping
 from typing import Any, Self, TypeVar
 
@@ -14,6 +15,21 @@ from calpit import _optional, _sklearn_backend, coverage, diagnostics, represent
 FloatArray = npt.NDArray[np.floating]
 
 DEFAULT_RANDOM_STATE = 299792458
+
+_TORCH_ONLY_PARAMS = (
+    "val_fraction",
+    "n_alpha_val",
+    "oversample",
+    "batch_size",
+    "max_epochs",
+    "lr",
+    "weight_decay",
+    "lr_decay",
+    "patience",
+    "num_workers",
+    "trainer_kwargs",
+)
+_SKLEARN_ONLY_PARAMS = ("n_alpha",)
 
 _Cde = TypeVar("_Cde", bound=representations.ConditionalDensities)
 
@@ -179,28 +195,43 @@ class CalPIT:
         """Returns the constructor arguments, as scikit-learn estimators do.
 
         Args:
-            deep: Unused; there are no nested estimators to expand.
+            deep: Whether to add the parameters of a model that has get_params,
+                such as a scikit-learn classifier, as model__<name>.
 
         Returns:
             The arguments by name.
         """
-        del deep  # Unused.
-        return {name: getattr(self, name) for name in inspect.signature(type(self)).parameters}
+        params = {name: getattr(self, name) for name in inspect.signature(type(self)).parameters}
+        if deep and hasattr(self.model, "get_params"):
+            for name, value in self.model.get_params(deep=True).items():
+                params[f"model__{name}"] = value
+        return params
 
     def set_params(self, **params: Any) -> Self:
         """Sets constructor arguments, as scikit-learn estimators do.
 
         Args:
-            **params: The arguments to set, by name.
+            **params: The arguments to set, by name; model__<name> sets a
+                parameter of the model.
 
         Returns:
             The estimator.
         """
         valid = inspect.signature(type(self)).parameters
+        model_params = {}
         for name, value in params.items():
-            if name not in valid:
+            if name.startswith("model__"):
+                model_params[name.removeprefix("model__")] = value
+            elif name in valid:
+                setattr(self, name, value)
+            else:
                 raise ValueError(f"invalid parameter for CalPIT: {name=}")
-            setattr(self, name, value)
+        if model_params:
+            if not hasattr(self.model, "set_params"):
+                raise ValueError(
+                    f"the model has no set_params for {sorted(model_params)}: {type(self.model)=}"
+                )
+            self.model.set_params(**model_params)
         return self
 
     def __repr__(self) -> str:
@@ -208,10 +239,23 @@ class CalPIT:
         defaults = inspect.signature(type(self)).parameters
         changed = [
             f"{name}={value!r}"
-            for name, value in self.get_params().items()
+            for name, value in self.get_params(deep=False).items()
             if value is not defaults[name].default and value != defaults[name].default
         ]
         return f"{type(self).__name__}({', '.join(changed)})"
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Returns the state to pickle, with a fitted network moved to the CPU.
+
+        predict moves the network to the device it was trained on, so without
+        this a CalPIT pickled after predicting on a GPU would only load where
+        CUDA is available. The network is moved in place; the next predict
+        moves it back.
+        """
+        state = self.__dict__.copy()
+        if _is_torch_module(state.get("model_")):
+            state["model_"] = state["model_"].cpu()
+        return state
 
     def __sklearn_is_fitted__(self) -> bool:
         """Returns whether fit has run, for sklearn.utils.validation.check_is_fitted."""
@@ -254,13 +298,21 @@ class CalPIT:
             raise ValueError(f"pit must have shape (n_objects,): {pit.shape=}, {x.shape=}")
         self.n_features_in_ = x.shape[1]
         if _sklearn_backend.is_sklearn_classifier(self.model):
+            self._warn_ignored(_TORCH_ONLY_PARAMS, "a scikit-learn model")
             self.backend_ = "sklearn"
             self.model_ = _sklearn_backend.fit_sklearn(self.model, x, pit, self.n_alpha, self.random_state)
         else:
             self._fit_torch(x, pit)
         return self
 
+    def _warn_ignored(self, names: tuple[str, ...], backend: str) -> None:
+        defaults = inspect.signature(type(self)).parameters
+        ignored = [name for name in names if getattr(self, name) != defaults[name].default]
+        if ignored:
+            warnings.warn(f"CalPIT ignores {', '.join(ignored)} with {backend}", UserWarning, stacklevel=3)
+
     def _fit_torch(self, x: np.ndarray, pit: np.ndarray) -> None:
+        self._warn_ignored(_SKLEARN_ONLY_PARAMS, "a PyTorch model")
         if self.model is not None and not _is_torch_module(self.model) and not callable(self.model):
             raise TypeError(
                 "model must be a torch.nn.Module, a scikit-learn classifier, a callable or None: "

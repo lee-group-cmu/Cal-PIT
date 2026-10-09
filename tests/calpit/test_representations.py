@@ -43,10 +43,7 @@ def _samples(means: np.ndarray) -> calpit.SampleCDE:
     )
 
 
-# The grid PIT stops at the last grid point at or below y, as calpit always has,
-# which biases it low by up to max(pdf) * grid spacing; test_metrics checks its
-# uniformity on a finer grid.
-@pytest.mark.parametrize("make", [_quantiles, _samples], ids=["quantiles", "samples"])
+@pytest.mark.parametrize("make", [_grid, _quantiles, _samples], ids=["grid", "quantiles", "samples"])
 def test_pit_of_calibrated_cdes_is_uniform(make, means, y_true) -> None:
     pit = make(means).pit(y_true)
     assert pit.shape == (N_OBJECTS,)
@@ -55,9 +52,11 @@ def test_pit_of_calibrated_cdes_is_uniform(make, means, y_true) -> None:
 
 def test_pit_agrees_across_representations(means, y_true) -> None:
     exact = stats.norm.cdf(y_true, loc=means)
+    np.testing.assert_allclose(_grid(means).pit(y_true), exact, atol=1e-4)
+    # The step PIT of calpit before 0.2 is biased low by up to max(pdf) * spacing.
+    step_pit = calpit.GridCDE(_grid(means).pdf, Y_GRID, pit_method="step").pit(y_true)
     spacing = Y_GRID[1] - Y_GRID[0]
-    grid_pit = _grid(means).pit(y_true)
-    assert ((grid_pit <= exact + 1e-9) & (grid_pit >= exact - stats.norm.pdf(0) * spacing)).all()
+    assert ((step_pit <= exact + 1e-9) & (step_pit >= exact - stats.norm.pdf(0) * spacing)).all()
     np.testing.assert_allclose(_quantiles(means).pit(y_true), exact, atol=2e-3)
     np.testing.assert_allclose(_samples(means).pit(y_true), exact, atol=0.05)
 
@@ -92,13 +91,12 @@ def test_identity_recalibration_keeps_quantiles(means) -> None:
     np.testing.assert_allclose(cde.recalibrate(np.tile(LEVELS, (N_OBJECTS, 1))).locations, cde.locations)
 
 
-def test_interp_rows_matches_numpy_in_blocks(monkeypatch) -> None:
+def test_interp_rows_matches_numpy() -> None:
     rng = np.random.default_rng(4)
     xp = np.sort(rng.uniform(0, 1, (30, 12)), axis=1)
     xp[:, 3] = xp[:, 4]  # A tie.
     fp = np.sort(rng.normal(size=(30, 12)), axis=1)
     x_new = rng.uniform(-0.1, 1.1, (30, 7))
-    monkeypatch.setattr(representations, "_MAX_COMPARISONS", 100)
     result = representations._interp_rows(x_new, xp, fp)
     for row in range(30):
         np.testing.assert_allclose(result[row], np.interp(x_new[row], xp[row], fp[row]))
@@ -107,6 +105,8 @@ def test_interp_rows_matches_numpy_in_blocks(monkeypatch) -> None:
 def test_invalid_shapes_are_rejected() -> None:
     with pytest.raises(ValueError, match="pdf must have shape"):
         calpit.GridCDE(np.zeros((3, 4)), np.zeros(5))
+    with pytest.raises(ValueError, match="pit_method must be one of"):
+        calpit.GridCDE(np.zeros((3, 4)), np.zeros(4), pit_method="nearest")
     with pytest.raises(ValueError, match="levels must increase"):
         calpit.QuantileCDE([0.5, 0.2], np.zeros((3, 2)))
 

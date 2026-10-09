@@ -49,7 +49,8 @@ def data() -> dict[str, np.ndarray]:
 def _old_and_new(old_model: torch.nn.Module, data: dict[str, np.ndarray], **fit_kwargs: int) -> tuple:
     new_model = nn.ConcatAlpha(copy.deepcopy(old_model), output="probability")
     x, y, y_grid, cde = data["x"][:900], data["y"][:900], data["y_grid"], data["cde"][:900]
-    pit = calpit.GridCDE(cde, y_grid).pit(y)
+    # The PIT of calpit 0.2's predecessors: the step method.
+    pit = calpit.GridCDE(cde, y_grid, pit_method="step").pit(y)
     torch.manual_seed(SEED)
     old_curves = legacy_calpit.fit(old_model, x, pit, seed=SEED, **fit_kwargs)
     new = calpit.CalPIT(
@@ -60,7 +61,7 @@ def _old_and_new(old_model: torch.nn.Module, data: dict[str, np.ndarray], **fit_
         random_state=SEED,
         rearrange=False,
         trainer_kwargs={"accelerator": "cpu"},
-    ).fit(x, y, calpit.GridCDE(cde, y_grid))
+    ).fit(x, y, calpit.GridCDE(cde, y_grid, pit_method="step"))
     return old_model, old_curves, new
 
 

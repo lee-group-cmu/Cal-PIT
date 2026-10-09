@@ -112,15 +112,29 @@ def anderson_darling_statistic(cdf_test: np.ndarray, cdf_ref: np.ndarray, n_tot:
     return np.sqrt(ad2)
 
 
-def probability_integral_transform(cde: np.ndarray, y_grid: np.ndarray, y_test: np.ndarray) -> np.ndarray:
+PIT_METHODS = ("linear", "step")
+
+
+def probability_integral_transform(
+    cde: np.ndarray, y_grid: np.ndarray, y_test: np.ndarray, method: str = "linear"
+) -> np.ndarray:
     """
     Calculates the Probability Integral Transform (PIT) based on Conditional Density Estimates (CDE).
+
+    The CDF is the trapezoid-rule integral of the density, which treats the density as linear
+    between grid points. With method "linear" (the default) the PIT integrates that piecewise
+    linear density exactly up to each true value, so its error falls with the square of the grid
+    spacing. Method "step" stops at the last grid point at or below the true value, as calpit
+    did before version 0.2; it is biased low by up to the density times the grid spacing, and is
+    kept to reproduce earlier results. Either way the PIT is 0 below the grid and the integral
+    over the whole grid above it.
 
     Args:
         cde (np.ndarray): A numpy array of conditional density estimates.
             Each row corresponds to an observation, each column corresponds to a grid point.
         y_grid (np.ndarray): A numpy array of the grid points at which cde is evaluated.
         y_test (np.ndarray): A numpy array of the true y values corresponding to the rows of cde.
+        method (str, optional): "linear" or "step", as described above. Defaults to "linear".
 
     Returns:
         np.ndarray: A numpy array of PIT values.
@@ -150,10 +164,24 @@ def probability_integral_transform(cde: np.ndarray, y_grid: np.ndarray, y_test: 
             f"Currently {ncol_cde} and {n_grid_points}."
         )
 
-    # The PIT is the CDF integrated up to the last grid point at or below y_test,
-    # and 0 when y_test lies below the grid.
+    if method not in PIT_METHODS:
+        raise ValueError(f"method must be one of {PIT_METHODS}: {method=}")
+
+    # The CDF integrated up to the last grid point at or below y_test.
     cdf = integrate.cumulative_trapezoid(cde, y_grid, axis=1, initial=0)
     last_below = np.searchsorted(y_grid, y_test, side="right") - 1
-    pit = cdf[np.arange(n_samples), np.clip(last_below, 0, None)]
+    rows = np.arange(n_samples)
+    left = np.clip(last_below, 0, n_grid_points - 1)
+    pit = cdf[rows, left]
+
+    if method == "linear" and n_grid_points > 1:
+        # Add the integral of the linearly interpolated density from that grid point to y_test.
+        right = np.minimum(left + 1, n_grid_points - 1)
+        spacing = y_grid[right] - y_grid[left]
+        inside = (last_below >= 0) & (last_below < n_grid_points - 1)
+        step = np.where(inside, y_test - y_grid[left], 0.0)
+        slope = np.where(inside, (cde[rows, right] - cde[rows, left]) / np.where(inside, spacing, 1.0), 0.0)
+        density_at_y = cde[rows, left] + slope * step
+        pit = pit + step * (cde[rows, left] + density_at_y) / 2
 
     return np.where(last_below >= 0, pit, 0.0)

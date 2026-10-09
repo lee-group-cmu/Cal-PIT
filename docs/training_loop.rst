@@ -16,7 +16,8 @@ The pieces
 ``calpit.coverage.train_val_split``       split by object, so all of an object's rows stay
                                           on one side
 ``calpit.nn.CoverageDataset``             training items ``(alpha, x, target)`` with a fresh
-                                          :math:`\alpha \sim U(0, 1)` every time an item is read
+                                          :math:`\alpha \sim U(0, 1)` every time an item is read;
+                                          ``.batches(batch_size)`` loads whole batches at once
 ``calpit.nn.CoverageGridDataset``         validation batches: every object at every
                                           :math:`\alpha` of a fixed grid, built on the fly
 ``calpit.nn.coverage_loss``               binary cross entropy for logit or probability
@@ -41,7 +42,6 @@ A plain PyTorch loop
 
    import numpy as np
    import torch
-   from torch.utils import data
 
    import calpit
    import calpit.nn
@@ -53,9 +53,7 @@ A plain PyTorch loop
    x_train, pit_train, x_val, pit_val = calpit.coverage.train_val_split(
        x_calib, pit, val_fraction=0.1, random_state=0
    )
-   train_loader = data.DataLoader(
-       calpit.nn.CoverageDataset(x_train, pit_train), batch_size=2048, shuffle=True
-   )
+   train_loader = calpit.nn.CoverageDataset(x_train, pit_train).batches(batch_size=2048)
    val_set = calpit.nn.CoverageGridDataset(x_val, pit_val, alpha=np.linspace(0.001, 0.999, 201))
 
    # 3. Train.

@@ -31,10 +31,47 @@ def test_pit_matches_previous_implementation(gaussian_cdes, rng) -> None:
     cde = gaussian_cdes.cde[:, ::40]
     y_true = gaussian_cdes.y_true.copy()
     y_true[:3] = [y_grid[0] - 1.0, y_grid[-1] + 1.0, y_grid[25]]  # below, above, on a node
-    pit = metrics.probability_integral_transform(cde, y_grid, y_true)
+    pit = metrics.probability_integral_transform(cde, y_grid, y_true, method="step")
     np.testing.assert_allclose(pit, _masked_pit(cde, y_grid, y_true), rtol=0, atol=1e-12)
     assert pit[0] == 0.0
     np.testing.assert_allclose(pit[1], integrate.trapezoid(cde[1], y_grid))
+
+
+@pytest.mark.parametrize("y_true", [-11.0, -10.0, -3.37, 0.0, 2.5, 10.0, 11.0])
+def test_linear_pit_integrates_the_trapezoid_density_exactly(y_true) -> None:
+    y_grid = np.linspace(-10.0, 10.0, 41)
+    pdf = stats.norm.pdf(y_grid, 0.5, 2.0)
+    pit = metrics.probability_integral_transform(pdf[None, :], y_grid, np.array([y_true]))[0]
+    # The trapezoid CDF treats the density as linear between grid points; integrate that exactly.
+    fine = np.linspace(-10.0, np.clip(y_true, -10.0, 10.0), 200001)
+    expected = integrate.trapezoid(np.interp(fine, y_grid, pdf), fine) if y_true >= -10.0 else 0.0
+    np.testing.assert_allclose(pit, expected, rtol=0, atol=1e-9)
+
+
+def test_linear_pit_error_falls_with_the_square_of_the_spacing(gaussian_cdes) -> None:
+    means, y_true = gaussian_cdes.means, gaussian_cdes.y_true
+    exact = stats.norm.cdf(y_true, loc=means)
+    errors = {}
+    for method in ("linear", "step"):
+        for spacing in (0.2, 0.1):
+            y_grid = np.arange(-10.0, 10.0 + spacing / 2, spacing)
+            cde = stats.norm.pdf(y_grid[None, :], loc=means[:, None])
+            pit = metrics.probability_integral_transform(cde, y_grid, y_true, method=method)
+            errors[method, spacing] = np.abs(pit - exact).max()
+    assert 3.5 < errors["linear", 0.2] / errors["linear", 0.1] < 4.5
+    assert 1.5 < errors["step", 0.2] / errors["step", 0.1] < 2.5
+    assert errors["linear", 0.1] < errors["step", 0.1] / 50
+
+
+def test_pit_methods_agree_on_grid_points(gaussian_cdes) -> None:
+    y_true = gaussian_cdes.y_grid[[100, 900, 1500]]
+    cde = gaussian_cdes.cde[:3]
+    np.testing.assert_array_equal(
+        metrics.probability_integral_transform(cde, gaussian_cdes.y_grid, y_true),
+        metrics.probability_integral_transform(cde, gaussian_cdes.y_grid, y_true, method="step"),
+    )
+    with pytest.raises(ValueError, match="method must be one of"):
+        metrics.probability_integral_transform(cde, gaussian_cdes.y_grid, y_true, method="nearest")
 
 
 def test_pit_rejects_mismatched_shapes(gaussian_cdes) -> None:

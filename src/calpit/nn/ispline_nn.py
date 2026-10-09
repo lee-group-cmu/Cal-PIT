@@ -185,3 +185,21 @@ class IsplineNN(nn.Module):
             torch.Tensor: The predicted probability that the PIT is at most alpha, shape (batch,).
         """
         return self.spline_layer(self.mlp_layers(x), alpha)
+
+    def forward_curves(self, alpha, x):
+        """
+        Evaluates the network at many coverage levels per object, running the MLP once per object.
+
+        Args:
+            alpha (torch.Tensor): The coverage levels in [0, 1], shape (batch, n_alpha).
+            x (torch.Tensor): The features, shape (batch, n_features).
+
+        Returns:
+            torch.Tensor: The predicted probability that the PIT is at most alpha,
+            shape (batch, n_alpha).
+        """
+        weights = self.spline_layer.coefs(self.mlp_layers(x))
+        grid = self.spline_layer.grid.to(alpha)
+        basis_vectors = self.spline_layer.basis_vectors.to(alpha)
+        basis = self.spline_layer.interp1d(grid, basis_vectors, alpha.reshape(-1)).reshape(*alpha.shape, -1)
+        return (basis * weights[:, None, :]).sum(axis=-1)

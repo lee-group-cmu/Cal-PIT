@@ -41,12 +41,16 @@ class _LossSums:
         self.losses.append(loss.detach())
         self.n_rows += n_rows
 
-    def mean(self) -> float:
-        if not self.n_rows:
-            return float("nan")
+    def mean(self, trainer: lightning.Trainer) -> float:
+        """Returns the mean loss per row, over all processes when training on several."""
         # Each batch's float32 sum is added in float64, keeping the GPU free of
         # a synchronizing .item() per batch.
-        return float(np.sum(torch.stack(self.losses).double().cpu().numpy())) / self.n_rows
+        total = float(np.sum(torch.stack(self.losses).double().cpu().numpy())) if self.losses else 0.0
+        n_rows = float(self.n_rows)
+        if trainer.world_size > 1:
+            sums = torch.tensor([total, n_rows], dtype=torch.float64, device=trainer.strategy.root_device)
+            total, n_rows = trainer.strategy.reduce(sums, reduce_op="sum").tolist()
+        return total / n_rows if n_rows else float("nan")
 
 
 class CalPITModule(lightning.LightningModule):
@@ -117,7 +121,7 @@ class CalPITModule(lightning.LightningModule):
 
     def on_train_epoch_end(self) -> None:
         """Records and logs the mean training loss per row as train_loss."""
-        self.train_loss_history.append(self._train_sums.mean())
+        self.train_loss_history.append(self._train_sums.mean(self.trainer))
         self.log("train_loss", self.train_loss_history[-1])
 
     def on_validation_epoch_start(self) -> None:
@@ -132,7 +136,7 @@ class CalPITModule(lightning.LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Records and logs the mean validation binary cross entropy per row as val_bce."""
         if not self.trainer.sanity_checking:
-            self.val_bce_history.append(self._val_sums.mean())
+            self.val_bce_history.append(self._val_sums.mean(self.trainer))
             self.log("val_bce", self.val_bce_history[-1])
 
     def configure_optimizers(self) -> lightning_types.OptimizerLRSchedulerConfig:
@@ -147,7 +151,8 @@ class CalPITModule(lightning.LightningModule):
 class BestWeightsEarlyStopping(lightning.Callback):
     """Stops training when the validation loss stops improving and restores the best weights.
 
-    It monitors the val_bce_history of a CalPITModule, in float64. An epoch
+    It monitors the val_bce_history of a CalPITModule, in float64 and summed
+    over all processes when training on several devices. An epoch
     counts as an improvement when its validation loss is at most the
     best so far. Training stops after `patience` epochs in a row without one.
     The best weights are kept in memory, not written to disk, and loaded back
@@ -184,8 +189,10 @@ class BestWeightsEarlyStopping(lightning.Callback):
             self.best_state = copy.deepcopy(pl_module.state_dict())
         else:
             self.wait_count += 1
-            if self.wait_count >= self.patience:
-                trainer.should_stop = True
+        # The validation loss is summed over all processes, so they agree; the
+        # reduction makes sure every process stops at the same epoch.
+        should_stop = trainer.strategy.reduce_boolean_decision(self.wait_count >= self.patience, all=False)
+        trainer.should_stop = trainer.should_stop or should_stop
 
     def on_fit_end(self, trainer: lightning.Trainer, pl_module: lightning.LightningModule) -> None:
         """Loads the best weights back into the module."""
@@ -258,11 +265,8 @@ def fit_lightning(
     if alpha_val is None:
         alpha_val = np.linspace(0.001, 0.999, 201)
     module = CalPITModule(model, lr=lr, weight_decay=weight_decay, lr_decay=lr_decay)
-    train_loader = data.DataLoader(
-        calpit_data.CoverageDataset(x_train, pit_train, oversample=oversample),
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
+    train_loader = calpit_data.CoverageDataset(x_train, pit_train, oversample=oversample).batches(
+        batch_size, num_workers=num_workers
     )
     callbacks: list[lightning.Callback] = []
     val_loader = None
