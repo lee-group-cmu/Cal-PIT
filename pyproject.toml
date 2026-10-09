@@ -12,15 +12,15 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dynamic = ["version"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "numpy",
-    "prettytable",
     "scipy>=1.6", # scipy.integrate.trapezoid
-    "torch",
-    "tqdm",
 ]
 
 [project.urls]
@@ -28,17 +28,25 @@ dependencies = [
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
-spline = [
-    "spline-basis", # Used by calpit.nn.IsplineNN
+torch = [
+    "lightning>=2.0", # Trains PyTorch models in calpit.CalPIT
+    "spline-basis", # Used by calpit.nn.IsplineNN, the default model
+    "torch",
+]
+sklearn = [
+    "scikit-learn>=1.4", # Trains scikit-learn classifiers in calpit.CalPIT
+]
+qp = [
+    "qp-prob", # Imports and exports qp ensembles in calpit.qp
 ]
 hdf5 = [
-    "h5py", # Used by calpit.datasets.PhotometryDataset
+    "h5py", # Used by calpit.nn.PhotometryDataset
 ]
 plot = [
     "matplotlib", # Used by calpit.utils.plot_pit
 ]
 all = [
-    "calpit[spline,hdf5,plot]",
+    "calpit[torch,sklearn,qp,hdf5,plot]",
 ]
 dev = [
     "calpit[all]",
@@ -67,7 +75,7 @@ testpaths = [
 
 [tool.ruff]
 line-length = 110
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [

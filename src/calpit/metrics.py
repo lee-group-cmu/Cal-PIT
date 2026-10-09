@@ -1,3 +1,5 @@
+"""Losses, PIT values and distances between CDFs for assessing CDEs on a grid."""
+
 import numpy as np
 from scipy import integrate
 
