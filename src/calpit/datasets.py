@@ -1,10 +1,9 @@
-from pathlib import Path
+"""Synthetic data sets for trying out Cal-PIT.
+
+The PyTorch data sets for training moved to calpit.nn.
+"""
 
 import numpy as np
-import torch
-from torch.utils.data import Dataset
-
-from calpit.nn import utils as nn_utils
 
 
 class TuningFork:
@@ -61,58 +60,3 @@ class TuningFork:
         y_data += double_fork * (1 - x_bern) * 1 * x_data[:, 1] - double_fork * x_bern * 1 * x_data[:, 1]
 
         return x_data, y_data
-
-
-# Kept for backwards compatibility; the implementation lives in calpit.nn.utils.
-RandomDataset = nn_utils.RandomDataset
-
-
-class PhotometryDataset(Dataset):
-    """
-    Training set for Cal-PIT read lazily from an HDF5 file of photometric features.
-
-    Like calpit.nn.utils.RandomDataset, each item is the features prepended with a coverage
-    level alpha drawn from Uniform(0, 1), and the target is 1 when the PIT is at most alpha.
-    The features are read row by row from the "dered_color_features" data set, so the file
-    need not fit in memory.
-
-    Args:
-        file_path (str or pathlib.Path): The path to an .hdf5 file with a
-            "dered_color_features" data set of shape (n_samples, n_features).
-        pit (np.ndarray): The PIT values, shape (n_samples,).
-        scaler (optional): An object with a scikit-learn style transform method applied to each
-            row of features. Defaults to None, which leaves the features unscaled.
-
-    Raises:
-        ImportError: If h5py is not installed.
-    """
-
-    def __init__(self, file_path=None, pit=None, scaler=None):
-        self.pit = pit
-        self.scaler = scaler
-        try:
-            import h5py  # noqa: PLC0415 - optional dependency.
-        except ImportError as error:
-            raise ImportError(
-                "PhotometryDataset requires the optional dependency h5py. "
-                "Install it with: pip install 'calpit[hdf5]'"
-            ) from error
-        if Path(file_path).suffix == ".hdf5":
-            self.file = h5py.File(file_path, "r")
-
-    def __len__(self):
-        key = list(self.file.keys())[0]
-        return len(self.file[key])
-
-    def __getitem__(self, idx):
-        x = self.file["dered_color_features"][idx]
-        if self.scaler:
-            x = self.scaler.transform(x.reshape(1, -1))
-        x = torch.tensor(x.squeeze())
-        y = torch.tensor(self.pit[idx])
-
-        alpha = torch.rand(1)
-        feature = torch.hstack([alpha, x])
-        target = (y <= alpha).float()
-
-        return feature, target

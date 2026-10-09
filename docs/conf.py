@@ -27,6 +27,9 @@ version = ".".join(release.split(".")[:2])
 extensions = ["sphinx.ext.mathjax", "sphinx.ext.napoleon", "sphinx.ext.viewcode"]
 
 extensions.append("autoapi.extension")
+# Render docstring "Attributes:" sections as fields, so autoapi's own entries
+# for the same attributes are not duplicate descriptions.
+napoleon_use_ivar = True
 extensions.append("nbsphinx")
 
 # -- sphinx-copybutton configuration ----------------------------------------

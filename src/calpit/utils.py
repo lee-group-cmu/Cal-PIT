@@ -1,7 +1,7 @@
+"""Helpers for CDEs on a grid: normalization, integration and the PIT histogram plot."""
+
 import numpy as np
-import torch
-from scipy import integrate
-from scipy.stats import binom
+from scipy import integrate, stats
 
 from calpit import metrics
 
@@ -78,24 +78,6 @@ def trapz_grid(y: np.ndarray, x: np.ndarray) -> np.ndarray:
     return np.hstack((np.zeros(len(integral))[:, None], integral))
 
 
-def trapz_grid_torch(y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-    """
-    Does trapezoid integration between the same limits as the grid, in PyTorch.
-
-    Args:
-        y (torch.Tensor): The values to integrate, shape (n_rows, n_grid).
-        x (torch.Tensor): The grid points, shape (n_grid,).
-
-    Returns:
-        torch.Tensor: The integrals from x[0] to each grid point, shape (n_rows, n_grid).
-    """
-    dx = torch.diff(x)
-    trapz_area = dx * (y[:, 1:] + y[:, :-1]) / 2
-    integral = torch.cumsum(trapz_area, dim=-1)
-    zeros = torch.zeros(len(integral), dtype=integral.dtype, device=x.device)
-    return torch.hstack((zeros[:, None], integral))
-
-
 def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
     """
     Plots the PIT histogram and the P-P plot of PIT values against a uniform distribution.
@@ -133,8 +115,8 @@ def plot_pit(pit_values, ci_level, n_bins=30, y_true=None, ax=None, **fig_kw):
 
     # Creating upper and lower limit for selected uniform band
     ci_quantity = (1 - ci_level) / 2
-    low_lim = binom.ppf(q=ci_quantity, n=n, p=1 / n_bins)
-    upp_lim = binom.ppf(q=ci_level + ci_quantity, n=n, p=1 / n_bins)
+    low_lim = stats.binom.ppf(q=ci_quantity, n=n, p=1 / n_bins)
+    upp_lim = stats.binom.ppf(q=ci_level + ci_quantity, n=n, p=1 / n_bins)
 
     # Creating figure
 

@@ -9,51 +9,47 @@ Full documentation for the project is available on [Read the Docs](https://cal-p
 Overview
 ---------------------------
 
-`calpit` is a Python package for diagnosing and recalibrating conditional density estimates. The package is built on top of Pytorch (with other ML backends to be added soon) and provides a simple and flexible interface matching the scikit-learn API.
+`calpit` diagnoses and recalibrates conditional density estimates (CDEs). It learns how the probability integral transform (PIT) of the CDEs varies with the features, which gives local P-P plots that show where the CDEs are miscalibrated, and a recalibration of the CDEs themselves.
+
+- CDEs can be densities on a grid, quantiles, samples or [qp](https://github.com/LSSTDESC/qp) ensembles.
+- Cal-PIT can be learned by any PyTorch network, trained with PyTorch Lightning, or by any scikit-learn classifier.
+- `CalPIT` follows the scikit-learn API, and every piece of the training is importable for hand-written training loops.
 
 
 Basic Usage
 ---------------------------
-The following is a basic recipe for using the `calpit` package:
 
 ```python
+import calpit
 
-   from calpit import CalPit #import the CalPit class
-   
-   calpit_model = CalPit(model=model) #Any Pytorch model CalPit class
-   
-   trained_model = calpit_model.fit(x_calib,y_calib, cde_cali,y_grid) #Fit the model with a calibration dataset
-   
-   pp_result = calpit_model.predict(x_test, cov_grid) #Predict the local PIT distribution for a test dataset
-   
-   new_cde = calpit_model.transform(x_test, cde_test, y_grid) #Recalibrate the conditional density estimate for a test dataset
+recalibrator = calpit.CalPIT().fit(x_calib, y_calib, calpit.GridCDE(pdf_calib, y_grid))
+
+local = recalibrator.diagnose(x_test)  # Local P-P curves and their distance from the diagonal.
+cde_new = recalibrator.transform(x_test, calpit.GridCDE(pdf_test, y_grid))  # Recalibrated CDEs.
 ```
 
-
-
+See the [user guide](https://cal-pit.readthedocs.io/en/latest/usage.html) for quantile, sample and qp CDEs, scikit-learn models and [hand-written training loops](https://cal-pit.readthedocs.io/en/latest/training_loop.html).
 
 
 Installation
 ---------------------------
 
-To install the current release of the package, you can run the following command:
-
 ```console
-   pip install calpit
+   pip install 'calpit[torch]'
 ```
 
-Some features need optional dependencies, which you can install as extras:
+The core needs only NumPy and SciPy; models and file formats come with extras:
 
 | Extra | Installs | Needed for |
 |---|---|---|
-| `spline` | `spline-basis` | `calpit.nn.IsplineNN` |
-| `hdf5` | `h5py` | `calpit.datasets.PhotometryDataset` |
-| `plot` | `matplotlib` | `calpit.utils.plot_pit` |
+| `torch` | `torch`, `lightning`, `spline-basis` | PyTorch models, including the default `calpit.nn.IsplineNN` |
+| `sklearn` | `scikit-learn` | scikit-learn models |
+| `qp` | `qp-prob` | `calpit.qp_io` |
+| `hdf5` | `h5py` | `calpit.nn.PhotometryDataset` |
+| `plot` | `matplotlib` | `calpit.utils.plot_pit`, `calpit.diagnostics.plot_local_pp` |
 | `all` | all of the above | |
 
-```console
-   pip install 'calpit[all]'
-```
+`calpit` needs Python 3.11 or later.
 
 To install the latest version of the code from Github, you can run the following command:
 
@@ -66,6 +62,6 @@ If you would like to install the package for development purposes, you can clone
 ```console
    >> git clone https://github.com/lee-group-cmu/Cal-PIT.git
    >> cd Cal-PIT
-   >> pip install -e .
+   >> pip install -e '.[dev]'
 ```
 

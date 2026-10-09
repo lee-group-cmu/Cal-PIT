@@ -1,6 +1,14 @@
+"""IsplineNN: a Cal-PIT network that is monotone in alpha by construction."""
+
 import numpy as np
 import torch
 import torch.nn as nn
+
+
+def _init_weights(module: nn.Module) -> None:
+    if isinstance(module, nn.Linear):
+        nn.init.kaiming_normal_(module.weight)
+        module.bias.data.fill_(0.01)
 
 
 class ISplineLayer(nn.Module):
@@ -122,27 +130,33 @@ class IsplineNN(nn.Module):
     """
     Network for Cal-PIT whose output is monotone in the coverage level alpha.
 
-    An MLP of PReLU layers maps [alpha, features] to the weights of an ISplineLayer, so the
-    predicted conditional PIT CDF is non-decreasing in alpha and the recalibrated densities
-    from CalPit.transform are non-negative.
+    An MLP of PReLU layers maps the features x to the weights of an ISplineLayer, which
+    evaluates the I-splines at alpha. The weights do not depend on alpha, so the predicted
+    PIT CDF is non-decreasing in alpha, runs from 0 at alpha = 0 to 1 at alpha = 1, and the
+    recalibrated densities from CalPIT.transform are non-negative.
 
     Args:
-        input_dim (int): The number of features, not counting alpha.
+        n_features (int): The number of features, not counting alpha.
         hidden_layers (list of int, optional): The widths of the hidden layers.
             Defaults to [512, 512, 512].
         dropout_p (float, optional): The dropout probability in the ISplineLayer.
             Defaults to 0.5.
         num_basis (int, optional): The number of I-spline basis functions. Defaults to 10.
 
+    Attributes:
+        output (str): "probability"; the network returns r itself, not its logit.
+
     Raises:
         ImportError: If spline-basis is not installed.
     """
 
-    def __init__(self, input_dim, hidden_layers=None, dropout_p=0.5, num_basis=10):
+    output = "probability"
+
+    def __init__(self, n_features, hidden_layers=None, dropout_p=0.5, num_basis=10):
         super().__init__()
         if hidden_layers is None:
             hidden_layers = [512, 512, 512]
-        self.all_layers = [input_dim + 1]
+        self.all_layers = [n_features]
         self.hidden_layers = hidden_layers
         self.all_layers.extend(hidden_layers)
         self.num_basis = num_basis
@@ -156,31 +170,18 @@ class IsplineNN(nn.Module):
             self.mlp_layer_list.append(nn.Linear(self.all_layers[i], self.all_layers[i + 1]))
             self.mlp_layer_list.append(nn.PReLU())
 
-        # self.mlp_layer_list.append(nn.Dropout(p=dropout_p))
         self.mlp_layers = nn.Sequential(*self.mlp_layer_list)
+        self.mlp_layers.apply(_init_weights)
 
-        def init_weights(m):
-            if isinstance(m, nn.Linear):
-                torch.nn.init.kaiming_normal_(m.weight)
-                m.bias.data.fill_(0.01)
-
-        self.mlp_layers.apply(init_weights)
-
-    def forward(self, x):
+    def forward(self, alpha, x):
         """
         Evaluates the network.
 
         Args:
-            x (torch.Tensor): The coverage level in column 0 followed by the features,
-                shape (batch, input_dim + 1).
+            alpha (torch.Tensor): The coverage levels in [0, 1], shape (batch,).
+            x (torch.Tensor): The features, shape (batch, n_features).
 
         Returns:
             torch.Tensor: The predicted probability that the PIT is at most alpha, shape (batch,).
         """
-        alpha = x[:, 0]
-
-        res = self.mlp_layers(x)
-
-        res = self.spline_layer(res, alpha)
-
-        return res
+        return self.spline_layer(self.mlp_layers(x), alpha)

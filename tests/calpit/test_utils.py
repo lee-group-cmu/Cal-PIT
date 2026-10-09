@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-import torch
 from scipy import integrate
 
 from calpit import utils
@@ -11,13 +10,6 @@ from calpit import utils
 def test_trapz_grid_matches_cumulative_trapezoid(gaussian_cdes) -> None:
     expected = integrate.cumulative_trapezoid(gaussian_cdes.cde, gaussian_cdes.y_grid, axis=1, initial=0)
     np.testing.assert_allclose(utils.trapz_grid(gaussian_cdes.cde, gaussian_cdes.y_grid), expected)
-
-
-def test_trapz_grid_torch_matches_numpy(gaussian_cdes) -> None:
-    expected = utils.trapz_grid(gaussian_cdes.cde, gaussian_cdes.y_grid)
-    result = utils.trapz_grid_torch(torch.tensor(gaussian_cdes.cde), torch.tensor(gaussian_cdes.y_grid))
-    assert result.dtype == torch.float64
-    np.testing.assert_allclose(result.numpy(), expected, rtol=1e-12)
 
 
 @pytest.mark.parametrize("n_rows", [None, 50])
